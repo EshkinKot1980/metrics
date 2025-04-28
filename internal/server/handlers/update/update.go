@@ -43,7 +43,7 @@ func validateHeaders(next http.Handler) http.Handler {
 		} else {
 			http.Error(
 				res,
-				"Invalid Content-Type header, header must be \"text/plain\"",
+				"invalid content-type header, header must be \"text/plain\"",
 				http.StatusBadRequest,
 			)
 		}
@@ -89,7 +89,7 @@ func (m metric) validate() error {
 			err = errors.New("invalid metric value, counter must be int64")
 		}
 	default:
-		err = errors.New("invalid metric type:" + m.mtype)
+		err = errors.New("invalid metric type: " + m.mtype)
 	}
 
 	return err
