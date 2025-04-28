@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"runtime"
-	"time"
 	"reflect"
 	"math"
 	"math/rand"
@@ -11,71 +10,64 @@ import (
 )
 
 type Storage interface {
-	PutCounter(model.Counter)
-	PutGauge(model.Gauge)
-	PutLock()
-	PutUnlock()
+	Put(c []model.Counter, g []model.Gauge)
 }
 
-var (
-	gauges   map[string]float64
-	counters map[string]int64
-	storage Storage
-)
-
-
-func Run(interval int, s Storage) {
-	storage = s
-	var i = time.Duration(interval) * time.Second
-	
-	for {
-		<-time.After(i)
-		collectMetrics()
-		storeMetrics()
-	}
+type Monitor struct {
+	storage  Storage
+	gauges   []model.Gauge
+	counters []model.Counter
 }
 
-func collectMetrics() {
-	//collect gauges
-	gauges = make(map[string]float64)
-	collectMemStats()
-	gauges["RandomValue"] = math.MaxFloat32 * rand.Float64()
-	//collect counters
-	counters = make(map[string]int64)
-	counters["PollCount"] = 1
+func New(s Storage) *Monitor {
+	return &Monitor{storage: s}
 }
 
-func storeMetrics() {
-	storage.PutLock()
-	defer storage.PutUnlock()
-
-	for n, v := range gauges {
-		storage.PutGauge(model.Gauge{Name: n, Value: v})
+func (m *Monitor) Poll() {
+	m.counters = [] model.Counter {
+		model.Counter{Name: "PollCount", Value: 1},
 	}
 
-	for n, v := range counters {
-		storage.PutCounter(model.Counter{Name: n, Value: v})
-	} 
+	m.gauges = make([]model.Gauge, 0 , len(model.MemStatsFields) +1)
+
+	m.collectMemStats()
+	m.gauges = append(
+		m.gauges,
+		model.Gauge{Name: "RandomValue", Value: math.MaxFloat32 * rand.Float64()},
+	)
+
+	m.storage.Put(m.counters, m.gauges)
 }
 
-func collectMemStats() {
-	var rtm runtime.MemStats
+func (m *Monitor) collectMemStats() {
+	var (
+		rtm runtime.MemStats
+		gval float64
+	)
 	runtime.ReadMemStats(&rtm)
-	val := reflect.ValueOf(rtm)
+	rval := reflect.ValueOf(rtm)
 
 	for _, field := range model.MemStatsFields {
-		switch fv := val.FieldByName(field); {
+		ok := true;
+
+		switch fv := rval.FieldByName(field); {
 		case fv.CanFloat():
-			gauges[field] = fv.Float()
+			gval = fv.Float()
 		case fv.CanUint():
-			gauges[field] = float64(fv.Uint())				
+			gval = float64(fv.Uint())
 		case fv.CanInt():
-			gauges[field] = float64(fv.Int())			
+			gval = float64(fv.Int())
 		default:
-			//TODO подумать над поведением в случае esle
 			if field == "EnableGC" {
-				gauges[field] = float64(1)
+				gval = float64(1)
+			} else {
+				//TODO: подумать над поведением, возможно ругнуться в лог
+				ok = false
 			}
+		}
+
+		if ok {
+			m.gauges = append(m.gauges, model.Gauge{Name: field, Value: gval})
 		}
 	}
 }

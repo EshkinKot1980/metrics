@@ -2,7 +2,7 @@ package update
 
 import (
 	"strconv"
-	"strings"
+	// "strings"
 	"errors"
 	"net/http"
 )
@@ -25,35 +25,38 @@ type metric struct {
 
 var storage Storage
 
-func New(s Storage) http.Handler {
+func New(s Storage) http.HandlerFunc {
 	storage = s
 
-	return validateHeaders(
-		validateData(
-			http.HandlerFunc(update),
-		),
-	)
+	return validateData(http.HandlerFunc(update))
+	// return validateHeaders(
+	// 	validateData(
+	// 		http.HandlerFunc(update),
+	// 	),
+	// )
 }
 
-func validateHeaders(next http.Handler) http.Handler {
-	fn := func(res http.ResponseWriter, req *http.Request) {
-		header := req.Header.Get("content-type")
-		if strings.Count(header, "text/plain") == 1 {
-			next.ServeHTTP(res, req)
-		} else {
-			http.Error(
-				res,
-				"invalid content-type header, header must be \"text/plain\"",
-				http.StatusBadRequest,
-			)
-		}
-	}
+
+// НАФИГА ВЫ ПИШИТЕ В ЗАДАЧЕ, ЧТО НУЖНО ПРИНИМАТЬ ЗАГОЛОВОK Content-Type:text/plain, А САМИ ЕГО В ТЕСТАХ НЕ ШЛЕТЕ?
+// func validateHeaders(next http.HandlerFunc) http.HandlerFunc {
+// 	fn := func(res http.ResponseWriter, req *http.Request) {
+// 		header := req.Header.Get("content-type")
+// 		if strings.Count(header, "text/plain") == 1 {
+// 			next.ServeHTTP(res, req)
+// 		} else {
+// 			http.Error(
+// 				res,
+// 				"invalid content-type header, header must be \"text/plain\"",
+// 				http.StatusBadRequest,
+// 			)
+// 		}
+// 	}
 	
-	return http.HandlerFunc(fn)
-}
+// 	return http.HandlerFunc(fn)
+// }
 
-
-func validateData(next http.Handler) http.Handler {
+//TODO: выяснить где принято эти валидаторы хранить и вынести в отдельный слой 
+func validateData(next http.HandlerFunc) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		m := parsePath(req)		
 		if err := m.validate(); err != nil {

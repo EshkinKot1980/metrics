@@ -18,7 +18,7 @@ type Storage interface {
 
 var storage Storage
 
-func New(s Storage) http.Handler {
+func New(s Storage) http.HandlerFunc {
 	storage = s
 
 	return http.HandlerFunc(value)
@@ -36,16 +36,16 @@ func value(res http.ResponseWriter, req *http.Request) {
 	switch t := req.PathValue("type"); t {
 	case TypeGauge:
 		gauge, err = storage.GetGauge(name)
-		body = fmt.Sprintf("%v\r\n", gauge)
+		body = fmt.Sprintf("%v", gauge)
 	case TypeCounter:
 		counter, err = storage.GetCounter(name)
-		body = fmt.Sprintf("%v\r\n", counter)
+		body = fmt.Sprintf("%v", counter)
 	default:
-		err = errors.New("Invalid metric type:" + t)
+		err = errors.New("invalid metric type: " + t)
 	}
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		http.Error(res, err.Error(), http.StatusNotFound)
 	} else {
 		res.Write([]byte(body))
 	}

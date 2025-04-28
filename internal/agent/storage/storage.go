@@ -18,20 +18,17 @@ func New() *MemoryStorage {
 	}
 }
 
-func (s *MemoryStorage) PutLock() {
+func (s *MemoryStorage) Put(c []model.Counter, g []model.Gauge) {
 	s.mx.Lock()
-}
+	defer s.mx.Unlock()
 
-func (s *MemoryStorage) PutUnlock() {
-	s.mx.Unlock()
-}
+	for _, m := range c {
+		s.counters[m.Name] += m.Value
+	}
 
-func (s *MemoryStorage) PutCounter(c model.Counter) {
-	s.counters[c.Name] += c.Value
-}
-
-func (s *MemoryStorage) PutGauge(g model.Gauge) {
-	s.gauges[g.Name] = g.Value
+	for _, m := range g {
+		s.gauges[m.Name] = m.Value
+	}
 }
 
 func (s *MemoryStorage) Pull() ([]model.Counter, []model.Gauge) {

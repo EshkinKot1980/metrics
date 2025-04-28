@@ -1,68 +1,72 @@
 package client
 
 import (
-	"io"
-	"strings"
 	"fmt"
-	"net/http"
 	"time"
+	"github.com/go-resty/resty/v2"
 	"github.com/EshkinKot1980/metrics/internal/agent/model"
 )
 
 const (
 	TypeGauge = "gauge"
 	TypeCounter = "counter"
-	ContentType = "text"
+	ContentType = "text/plain"
 )
 
 type Storage interface {
 	Pull() ([]model.Counter, []model.Gauge)
 }
 
-var (
+type Client struct{
 	storage Storage
-	client *http.Client
-	address = "http://localhost:8080"
-)
+	address string
+	client *resty.Client
+}
 
-func Run(interval int, s Storage) {
-	var i = time.Duration(interval) * time.Second
-	storage = s	
-	client = &http.Client{
-		Timeout: time.Second * 1,
-	}
-
-	for {
-		<-time.After(i)
-		counters, gauges := s.Pull()
-
-		for _, c := range counters {
-			url := fmt.Sprintf("%s/update/%s/%s/%v",address, TypeCounter, c.Name, c.Value)
-			sendMetric(url)
-		}
-
-		for _, g := range gauges {
-			url := fmt.Sprintf("%s/update/%s/%s/%v",address, TypeGauge, g.Name, g.Value)
-			sendMetric(url)
-		}
+func New(s Storage, serverAddr string) *Client {
+	return &Client{
+		storage: s,
+		address: serverAddr,
+		client: resty.New().
+			SetTimeout(time.Duration(1) * time.Minute).
+			SetBaseURL(serverAddr + "/update").
+			SetHeader("Content-Type", "text/plain"),
 	}
 }
 
-func sendMetric(url string) {
-	resp, err := client.Post(url, "text/plain", nil)
-		if err !=nil {
-			//TODO: заменить на логер
-			fmt.Println(err.Error())
-		}
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			//TODO: заменить на логер
-			fmt.Printf(
-				"server error: {url:%s ,code: %v, body: %s}\n",
-				url,
-				resp.StatusCode,
-				strings.TrimSuffix(string(body), "\n"),
-			)
-		}
-		resp.Body.Close()
+func (c *Client) Report() {
+	params := make(map[string]string)
+    counters, gauges := c.storage.Pull()
+
+
+	params["type"] = TypeCounter
+	for _, m := range counters {
+		params["name"] = m.Name
+		params["value"] = fmt.Sprintf("%v",m.Value)
+		c.sendMetric(params)
+	}
+
+	params["type"] = TypeGauge
+	for _, m := range gauges {
+		params["name"] = m.Name
+		params["value"] = fmt.Sprintf("%v",m.Value)
+		c.sendMetric(params)
+	}
+}
+
+func (c *Client) sendMetric(params map[string]string) {
+	req := c.client.R().SetPathParams(params)
+	resp, err := req.Post("/{type}/{name}/{value}")
+	
+	if err !=nil {
+		//TODO: заменить на логер
+		fmt.Println(err.Error())
+		return 
+	}
+
+	if !resp.IsSuccess() {
+		//TODO: заменить на логер
+		fmt.Println(req.URL)
+		fmt.Println("Code:", resp.StatusCode(), "Body:", resp)			
+	}
 }
