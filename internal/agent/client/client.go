@@ -10,6 +10,7 @@ import (
 const (
 	TypeGauge = "gauge"
 	TypeCounter = "counter"
+	PathPrefix = "update"
 	ContentType = "text/plain"
 )
 
@@ -28,8 +29,8 @@ func New(s Storage, serverAddr string) *Client {
 		storage: s,
 		address: serverAddr,
 		client: resty.New().
-			SetTimeout(time.Duration(1) * time.Minute).
-			SetBaseURL(serverAddr + "/update").
+			SetTimeout(time.Duration(1) * time.Second).
+			SetBaseURL(serverAddr + "/" + PathPrefix).
 			SetHeader("Content-Type", "text/plain"),
 	}
 }
@@ -37,7 +38,6 @@ func New(s Storage, serverAddr string) *Client {
 func (c *Client) Report() {
 	params := make(map[string]string)
     counters, gauges := c.storage.Pull()
-
 
 	params["type"] = TypeCounter
 	for _, m := range counters {
