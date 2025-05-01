@@ -1,110 +1,48 @@
 package update
 
 import (
-	"strconv"
-	// "strings"
-	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+
+	"github.com/EshkinKot1980/metrics/internal/server"
 )
 
-const (
-	TypeGauge = "gauge"
-	TypeCounter = "counter"
-)
-
-type Storage interface {
+type Updater interface {
 	PutCounter(name string, incriment int64)
 	PutGauge(name string, value float64)
 }
 
-type metric struct {
-	mtype string
-	name string
-	value string
+type UpdateHandler struct {
+	updater Updater
 }
 
-var storage Storage
-
-func New(s Storage) http.HandlerFunc {
-	storage = s
-
-	return validateData(http.HandlerFunc(update))
-	// return validateHeaders(
-	// 	validateData(
-	// 		http.HandlerFunc(update),
-	// 	),
-	// )
+func New(u Updater) *UpdateHandler {
+	return &UpdateHandler{updater: u}
 }
 
+func (h *UpdateHandler) Update(res http.ResponseWriter, req *http.Request) {
+	const op = "server.handlers.update.UpdateHandler.Update"
 
-// НАФИГА ВЫ ПИШИТЕ В ЗАДАЧЕ, ЧТО НУЖНО ПРИНИМАТЬ ЗАГОЛОВОK Content-Type:text/plain, А САМИ ЕГО В ТЕСТАХ НЕ ШЛЕТЕ?
-// func validateHeaders(next http.HandlerFunc) http.HandlerFunc {
-// 	fn := func(res http.ResponseWriter, req *http.Request) {
-// 		header := req.Header.Get("content-type")
-// 		if strings.Count(header, "text/plain") == 1 {
-// 			next.ServeHTTP(res, req)
-// 		} else {
-// 			http.Error(
-// 				res,
-// 				"invalid content-type header, header must be \"text/plain\"",
-// 				http.StatusBadRequest,
-// 			)
-// 		}
-// 	}
-	
-// 	return http.HandlerFunc(fn)
-// }
-
-//TODO: выяснить где принято эти валидаторы хранить и вынести в отдельный слой 
-func validateData(next http.HandlerFunc) http.HandlerFunc {
-	fn := func(res http.ResponseWriter, req *http.Request) {
-		m := parsePath(req)		
-		if err := m.validate(); err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
-		} else {
-			next.ServeHTTP(res, req)
+	switch m := server.ParsePath(req); m.Mtype {
+	case server.TypeGauge:
+		v, err := strconv.ParseFloat(m.Value, 64)
+		if err != nil {
+			// TODO: Отправить ERROR в логер
+			err = fmt.Errorf("unexpected error in %s: %w", op, err)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
 		}
-	}
-
-	return http.HandlerFunc(fn)
-}
-
-
-
-func parsePath(req *http.Request) metric {
-	return metric {
-		mtype: req.PathValue("type"),
-		name:  req.PathValue("name"),
-		value: req.PathValue("value"),
-	}
-}
-
-func (m metric) validate() error {
-	var err error
-	
-	switch m.mtype {
-	case TypeGauge:
-		if _, e := strconv.ParseFloat(m.value, 64); e != nil {
-			err = errors.New("invalid metric value, gauge must be float64")
+		h.updater.PutGauge(m.Name, v)
+	case server.TypeCounter:
+		v, err := strconv.ParseInt(m.Value, 10, 64)
+		if err != nil {
+			// TODO: Отправить ERROR в логер
+			err = fmt.Errorf("unexpected error in %s: %w", op, err)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
 		}
-	case TypeCounter:
-		if _, e := strconv.ParseInt(m.value, 10, 64); e != nil {
-			err = errors.New("invalid metric value, counter must be int64")
-		}
-	default:
-		err = errors.New("invalid metric type: " + m.mtype)
+		h.updater.PutCounter(m.Name, v)
 	}
-
-	return err
-}
-
-func update(res http.ResponseWriter, req *http.Request) {
-	switch m := parsePath(req); m.mtype {
-	case TypeGauge:
-		v, _ := strconv.ParseFloat(m.value, 64)
-		storage.PutGauge(m.name, v)		
-	case TypeCounter:
-		v, _ := strconv.ParseInt(m.value, 10, 64)
-		storage.PutCounter(m.name,v)
-	}
+	res.WriteHeader(http.StatusOK)
 }

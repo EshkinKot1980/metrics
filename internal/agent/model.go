@@ -1,12 +1,12 @@
-package model
+package agent
 
 type Gauge struct {
-	Name string
+	Name  string
 	Value float64
 }
 
 type Counter struct {
-	Name string
+	Name  string
 	Value int64
 }
 

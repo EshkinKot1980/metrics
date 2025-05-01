@@ -1,54 +1,54 @@
 package monitor
 
 import (
-	"runtime"
-	"reflect"
 	"math"
 	"math/rand"
+	"reflect"
+	"runtime"
 
-	"github.com/EshkinKot1980/metrics/internal/agent/model"
+	"github.com/EshkinKot1980/metrics/internal/agent"
 )
 
-type Storage interface {
-	Put(c []model.Counter, g []model.Gauge)
+type Updater interface {
+	Put(c []agent.Counter, g []agent.Gauge)
 }
 
 type Monitor struct {
-	storage  Storage
-	gauges   []model.Gauge
-	counters []model.Counter
+	updater  Updater
+	gauges   []agent.Gauge
+	counters []agent.Counter
 }
 
-func New(s Storage) *Monitor {
-	return &Monitor{storage: s}
+func New(u Updater) *Monitor {
+	return &Monitor{updater: u}
 }
 
 func (m *Monitor) Poll() {
-	m.counters = [] model.Counter {
-		model.Counter{Name: "PollCount", Value: 1},
+	m.counters = []agent.Counter{
+		agent.Counter{Name: "PollCount", Value: 1},
 	}
 
-	m.gauges = make([]model.Gauge, 0 , len(model.MemStatsFields) +1)
+	m.gauges = make([]agent.Gauge, 0, len(agent.MemStatsFields)+1)
 
 	m.collectMemStats()
 	m.gauges = append(
 		m.gauges,
-		model.Gauge{Name: "RandomValue", Value: math.MaxFloat32 * rand.Float64()},
+		agent.Gauge{Name: "RandomValue", Value: math.MaxFloat32 * rand.Float64()},
 	)
 
-	m.storage.Put(m.counters, m.gauges)
+	m.updater.Put(m.counters, m.gauges)
 }
 
 func (m *Monitor) collectMemStats() {
 	var (
-		rtm runtime.MemStats
+		rtm  runtime.MemStats
 		gval float64
 	)
 	runtime.ReadMemStats(&rtm)
 	rval := reflect.ValueOf(rtm)
 
-	for _, field := range model.MemStatsFields {
-		ok := true;
+	for _, field := range agent.MemStatsFields {
+		ok := true
 
 		switch fv := rval.FieldByName(field); {
 		case fv.CanFloat():
@@ -67,7 +67,7 @@ func (m *Monitor) collectMemStats() {
 		}
 
 		if ok {
-			m.gauges = append(m.gauges, model.Gauge{Name: field, Value: gval})
+			m.gauges = append(m.gauges, agent.Gauge{Name: field, Value: gval})
 		}
 	}
 }

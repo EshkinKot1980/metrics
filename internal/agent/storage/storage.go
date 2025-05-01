@@ -1,14 +1,14 @@
 package storage
 
 import (
+	"github.com/EshkinKot1980/metrics/internal/agent"
 	"sync"
-	"github.com/EshkinKot1980/metrics/internal/agent/model"
 )
 
 type MemoryStorage struct {
-	mx 	 sync.Mutex
+	mx       sync.Mutex
 	counters map[string]int64
-	gauges   map[string]float64 
+	gauges   map[string]float64
 }
 
 func New() *MemoryStorage {
@@ -18,7 +18,7 @@ func New() *MemoryStorage {
 	}
 }
 
-func (s *MemoryStorage) Put(c []model.Counter, g []model.Gauge) {
+func (s *MemoryStorage) Put(c []agent.Counter, g []agent.Gauge) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
@@ -31,7 +31,7 @@ func (s *MemoryStorage) Put(c []model.Counter, g []model.Gauge) {
 	}
 }
 
-func (s *MemoryStorage) Pull() ([]model.Counter, []model.Gauge) {
+func (s *MemoryStorage) Pull() ([]agent.Counter, []agent.Gauge) {
 	s.mx.Lock()
 	defer func() {
 		s.counters = make(map[string]int64)
@@ -39,19 +39,19 @@ func (s *MemoryStorage) Pull() ([]model.Counter, []model.Gauge) {
 		s.mx.Unlock()
 	}()
 
-	counters := make([]model.Counter, len(s.counters))
-	i := 0 
+	counters := make([]agent.Counter, len(s.counters))
+	i := 0
 	for n, v := range s.counters {
-		counters[i] = model.Counter{Name: n, Value: v}
+		counters[i] = agent.Counter{Name: n, Value: v}
 		i++
 	}
 
-	gauges := make([]model.Gauge, len(s.gauges))
-	i = 0 
-	for n, v := range s.gauges {		
-		gauges[i] = model.Gauge{Name: n, Value: v}
+	gauges := make([]agent.Gauge, len(s.gauges))
+	i = 0
+	for n, v := range s.gauges {
+		gauges[i] = agent.Gauge{Name: n, Value: v}
 		i++
 	}
-	
+
 	return counters, gauges
 }

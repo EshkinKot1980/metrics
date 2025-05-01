@@ -1,4 +1,4 @@
-package update
+package retrieve
 
 import (
 	"io"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/EshkinKot1980/metrics/internal/server/middleware"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,13 +15,11 @@ func TestNew(t *testing.T) {
 	type pathValues struct {
 		mtype string
 		name  string
-		value string
 	}
 
 	type request struct {
-		path        string
-		values      pathValues
-		contentType string
+		path   string
+		values pathValues
 	}
 
 	type want struct {
@@ -38,98 +35,88 @@ func TestNew(t *testing.T) {
 		{
 			name: "positive_counter",
 			req: request{
-				path: "/update/counter/TestCounter/1",
+				path: "/value/counter/TestCounter",
 				values: pathValues{
 					mtype: "counter",
 					name:  "TestCounter",
-					value: "1",
 				},
-				contentType: "text/plain",
 			},
 			want: want{
 				code: http.StatusOK,
-				body: "",
+				body: "13",
 			},
 		},
 		{
 			name: "negative_counter",
 			req: request{
-				path: "/update/counter/TestCounter/3.14",
+				path: "/value/counter/Unknown",
 				values: pathValues{
 					mtype: "counter",
-					name:  "TestCounter",
-					value: "3.14",
+					name:  "Unknown",
 				},
-				contentType: "text/plain",
 			},
 			want: want{
-				code: http.StatusBadRequest,
-				body: "invalid metric value, counter must be int64, given: 3.14",
+				code: http.StatusNotFound,
+				body: "counter metric not found",
 			},
 		},
 		{
 			name: "positive_gauge",
 			req: request{
-				path: "/update/gauge/TestGauge/3.14",
+				path: "/value/gauge/TestGauge",
 				values: pathValues{
 					mtype: "gauge",
 					name:  "TestGauge",
-					value: "3.14",
 				},
-				contentType: "text/plain",
 			},
 			want: want{
 				code: http.StatusOK,
-				body: "",
+				body: "3.14",
 			},
 		},
 		{
 			name: "negative_gauge",
 			req: request{
-				path: "/update/gauge/TestGauge/wtf",
+				path: "/value/gauge/Unknown",
 				values: pathValues{
 					mtype: "gauge",
-					name:  "TestGauge",
-					value: "wtf",
+					name:  "Unknown",
 				},
-				contentType: "text/plain",
 			},
 			want: want{
-				code: http.StatusBadRequest,
-				body: "invalid metric value, gauge must be float64, given: wtf",
+				code: http.StatusNotFound,
+				body: "gauge metric not found",
 			},
 		},
 		{
 			name: "negative_metric_type",
 			req: request{
-				path: "/update/unknown/TestUnknown/1",
+				path: "/value/unknown/TestUnknown",
 				values: pathValues{
 					mtype: "unknown",
 					name:  "TestUnknown",
-					value: "1",
 				},
-				contentType: "text/plain",
 			},
 			want: want{
-				code: http.StatusBadRequest,
+				code: http.StatusNotFound,
 				body: "invalid metric type: unknown",
 			},
 		},
 	}
 
-	updater := memory.New()
-	handler := New(updater)
+	retriever := memory.New()
+	retriever.PutCounter("TestCounter", 13)
+	retriever.PutGauge("TestGauge", 3.14)
+	handler := New(retriever)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, test.req.path, nil)
-			req.Header.Set("content-type", test.req.contentType)
+			req := httptest.NewRequest(http.MethodGet, test.req.path, nil)
 			req.SetPathValue("type", test.req.values.mtype)
 			req.SetPathValue("name", test.req.values.name)
-			req.SetPathValue("value", test.req.values.value)
 
 			w := httptest.NewRecorder()
-			middleware.ValidateMetric(http.HandlerFunc(handler.Update)).ServeHTTP(w, req)
+			handler.Retrieve(w, req)
 			res := w.Result()
 			defer res.Body.Close()
 

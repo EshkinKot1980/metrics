@@ -2,14 +2,15 @@ package main
 
 import (
 	"time"
-	"github.com/EshkinKot1980/metrics/internal/agent/config"
-	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
+
+	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/client"
+	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
 )
 
 func main() {
-	cfg := config.MustLoad()
+	cfg := agent.MustLoadConfig()
 	s := storage.New()
 	c := client.New(s, cfg.BaseURL)
 	m := monitor.New(s)
