@@ -1,19 +1,19 @@
 package value
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"net/http"
 )
 
 const (
-	TypeGauge = "gauge"
+	TypeGauge   = "gauge"
 	TypeCounter = "counter"
 )
 
 type Storage interface {
-	GetCounter(name string) (int64 ,error)
-	GetGauge(name string) (float64 ,error)
+	GetCounter(name string) (int64, error)
+	GetGauge(name string) (float64, error)
 }
 
 var storage Storage
@@ -26,13 +26,13 @@ func New(s Storage) http.HandlerFunc {
 
 func value(res http.ResponseWriter, req *http.Request) {
 	var (
-		name = req.PathValue("name")
-		gauge float64
+		name    = req.PathValue("name")
+		gauge   float64
 		counter int64
-		err error
-		body string	
+		err     error
+		body    string
 	)
-	
+
 	switch t := req.PathValue("type"); t {
 	case TypeGauge:
 		gauge, err = storage.GetGauge(name)

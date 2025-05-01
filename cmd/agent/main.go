@@ -2,9 +2,10 @@ package main
 
 import (
 	"time"
+
+	"github.com/EshkinKot1980/metrics/internal/agent/client"
 	"github.com/EshkinKot1980/metrics/internal/agent/config"
 	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
-	"github.com/EshkinKot1980/metrics/internal/agent/client"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
 )
 

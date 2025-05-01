@@ -1,10 +1,10 @@
 package monitor
 
 import (
-	"runtime"
-	"reflect"
 	"math"
 	"math/rand"
+	"reflect"
+	"runtime"
 
 	"github.com/EshkinKot1980/metrics/internal/agent/model"
 )
@@ -24,11 +24,11 @@ func New(s Storage) *Monitor {
 }
 
 func (m *Monitor) Poll() {
-	m.counters = [] model.Counter {
+	m.counters = []model.Counter{
 		model.Counter{Name: "PollCount", Value: 1},
 	}
 
-	m.gauges = make([]model.Gauge, 0 , len(model.MemStatsFields) +1)
+	m.gauges = make([]model.Gauge, 0, len(model.MemStatsFields)+1)
 
 	m.collectMemStats()
 	m.gauges = append(
@@ -41,14 +41,14 @@ func (m *Monitor) Poll() {
 
 func (m *Monitor) collectMemStats() {
 	var (
-		rtm runtime.MemStats
+		rtm  runtime.MemStats
 		gval float64
 	)
 	runtime.ReadMemStats(&rtm)
 	rval := reflect.ValueOf(rtm)
 
 	for _, field := range model.MemStatsFields {
-		ok := true;
+		ok := true
 
 		switch fv := rval.FieldByName(field); {
 		case fv.CanFloat():

@@ -1,14 +1,14 @@
 package storage
 
 import (
-	"sync"
 	"github.com/EshkinKot1980/metrics/internal/agent/model"
+	"sync"
 )
 
 type MemoryStorage struct {
-	mx 	 sync.Mutex
+	mx       sync.Mutex
 	counters map[string]int64
-	gauges   map[string]float64 
+	gauges   map[string]float64
 }
 
 func New() *MemoryStorage {
@@ -40,18 +40,18 @@ func (s *MemoryStorage) Pull() ([]model.Counter, []model.Gauge) {
 	}()
 
 	counters := make([]model.Counter, len(s.counters))
-	i := 0 
+	i := 0
 	for n, v := range s.counters {
 		counters[i] = model.Counter{Name: n, Value: v}
 		i++
 	}
 
 	gauges := make([]model.Gauge, len(s.gauges))
-	i = 0 
-	for n, v := range s.gauges {		
+	i = 0
+	for n, v := range s.gauges {
 		gauges[i] = model.Gauge{Name: n, Value: v}
 		i++
 	}
-	
+
 	return counters, gauges
 }

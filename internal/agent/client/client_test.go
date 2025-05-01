@@ -1,11 +1,12 @@
 package client
 
-import(
-	"strings"
-	"strconv"
+import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,15 +18,15 @@ func testRequest(req *http.Request) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, req.Method)
 		assert.Equal(t, ContentType, req.Header.Get("Content-Type"))
-		
+
 		pathParts := strings.Split(req.URL.Path, "/")
-		require.Equal(t, 5 , len(pathParts))
-		assert.Equal(t, PathPrefix,  pathParts[1])
+		require.Equal(t, 5, len(pathParts))
+		assert.Equal(t, PathPrefix, pathParts[1])
 		require.Contains(t, []string{TypeCounter, TypeGauge}, pathParts[2])
 
 		switch pathParts[2] {
 		case TypeGauge:
-			 _, err := strconv.ParseFloat(pathParts[4], 64)
+			_, err := strconv.ParseFloat(pathParts[4], 64)
 			assert.Nil(t, err)
 		case TypeCounter:
 			_, err := strconv.ParseInt(pathParts[4], 10, 64)
@@ -46,7 +47,7 @@ func TestReport(t *testing.T) {
 
 func makeHadler(t *testing.T) http.Handler {
 	fn := func(res http.ResponseWriter, req *http.Request) {
-		name :=  "report test PATH:" + req.URL.Path
+		name := "report test PATH:" + req.URL.Path
 		t.Run(name, testRequest(req))
 	}
 
@@ -57,7 +58,7 @@ func initStorage(s *storage.MemoryStorage) {
 	s.Put(
 		[]model.Counter{
 			model.Counter{Name: "TestCounter", Value: 13},
-			model.Counter{Name: "Visitord", Value: 256},
+			model.Counter{Name: "Visitors", Value: 256},
 		},
 		[]model.Gauge{
 			model.Gauge{Name: "ConstE", Value: 2.71828},
