@@ -1,4 +1,4 @@
-package value
+package retrieve
 
 import (
 	"io"
@@ -7,9 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
@@ -105,10 +104,10 @@ func TestNew(t *testing.T) {
 		},
 	}
 
-	storage := memory.New()
-	storage.PutCounter("TestCounter", 13)
-	storage.PutGauge("TestGauge", 3.14)
-	handler := New(storage)
+	retriever := memory.New()
+	retriever.PutCounter("TestCounter", 13)
+	retriever.PutGauge("TestGauge", 3.14)
+	handler := New(retriever)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -117,7 +116,7 @@ func TestNew(t *testing.T) {
 			req.SetPathValue("name", test.req.values.name)
 
 			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
+			handler.Retrieve(w, req)
 			res := w.Result()
 			defer res.Body.Close()
 

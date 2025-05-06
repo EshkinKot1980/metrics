@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/EshkinKot1980/metrics/internal/server/middleware"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
@@ -117,8 +117,8 @@ func TestNew(t *testing.T) {
 		},
 	}
 
-	storage := memory.New()
-	handler := New(storage)
+	updater := memory.New()
+	handler := New(updater)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -129,7 +129,7 @@ func TestNew(t *testing.T) {
 			req.SetPathValue("value", test.req.values.value)
 
 			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
+			middleware.ValidateMetric(http.HandlerFunc(handler.Update)).ServeHTTP(w, req)
 			res := w.Result()
 			defer res.Body.Close()
 
