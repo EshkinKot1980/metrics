@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"net/http"
 	"os"
 
@@ -25,7 +26,7 @@ func main() {
 
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 

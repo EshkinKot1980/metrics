@@ -21,10 +21,10 @@ var storage Storage
 func New(s Storage) http.HandlerFunc {
 	storage = s
 
-	return http.HandlerFunc(value)
+	return http.HandlerFunc(renderMetric)
 }
 
-func value(res http.ResponseWriter, req *http.Request) {
+func renderMetric(res http.ResponseWriter, req *http.Request) {
 	var (
 		name    = req.PathValue("name")
 		gauge   float64

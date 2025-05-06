@@ -34,7 +34,7 @@ func TestNew(t *testing.T) {
 		want want
 	}{
 		{
-			name: "positive counter test",
+			name: "positive_counter",
 			req: request{
 				path: "/value/counter/TestCounter",
 				values: pathValues{
@@ -48,7 +48,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "negative counter test",
+			name: "negative_counter",
 			req: request{
 				path: "/value/counter/Unknown",
 				values: pathValues{
@@ -62,7 +62,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "positive gauge test",
+			name: "positive_gauge",
 			req: request{
 				path: "/value/gauge/TestGauge",
 				values: pathValues{
@@ -76,7 +76,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "negative gauge test",
+			name: "negative_gauge",
 			req: request{
 				path: "/value/gauge/Unknown",
 				values: pathValues{
@@ -90,7 +90,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "negative metric type test",
+			name: "negative_metric_type",
 			req: request{
 				path: "/value/unknown/TestUnknown",
 				values: pathValues{
@@ -121,9 +121,13 @@ func TestNew(t *testing.T) {
 			res := w.Result()
 			defer res.Body.Close()
 
-			assert.Equal(t, test.want.code, res.StatusCode)
-			resBody, _ := io.ReadAll(res.Body)
-			assert.Equal(t, test.want.body, strings.TrimSuffix(string(resBody), "\n"))
+			assert.Equal(t, test.want.code, res.StatusCode, "Response status code")
+			resBody, err := io.ReadAll(res.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := strings.TrimSuffix(string(resBody), "\n")
+			assert.Equal(t, test.want.body, body, "Response body")
 		})
 	}
 }

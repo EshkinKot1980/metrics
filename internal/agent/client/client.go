@@ -32,7 +32,7 @@ func New(s Storage, serverAddr string) *Client {
 		address: serverAddr,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
-			SetBaseURL(serverAddr + "/" + PathPrefix).
+			SetBaseURL(serverAddr+"/"+PathPrefix).
 			SetHeader("Content-Type", "text/plain"),
 	}
 }

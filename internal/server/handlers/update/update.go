@@ -1,7 +1,7 @@
 package update
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -27,7 +27,7 @@ var storage Storage
 func New(s Storage) http.HandlerFunc {
 	storage = s
 
-	return validateData(http.HandlerFunc(update))
+	return validateData(http.HandlerFunc(saveMetric))
 }
 
 // TODO: выяснить где принято эти валидаторы хранить и вынести в отдельный слой
@@ -53,31 +53,37 @@ func parsePath(req *http.Request) metric {
 }
 
 func (m metric) validate() error {
-	var err error
-
 	switch m.mtype {
 	case TypeGauge:
-		if _, e := strconv.ParseFloat(m.value, 64); e != nil {
-			err = errors.New("invalid metric value, gauge must be float64")
+		if _, err := strconv.ParseFloat(m.value, 64); err != nil {
+			return fmt.Errorf("invalid metric value, gauge must be float64, given: %s", m.value)
 		}
 	case TypeCounter:
-		if _, e := strconv.ParseInt(m.value, 10, 64); e != nil {
-			err = errors.New("invalid metric value, counter must be int64")
+		if _, err := strconv.ParseInt(m.value, 10, 64); err != nil {
+			return fmt.Errorf("invalid metric value, counter must be int64, given: %s", m.value)
 		}
 	default:
-		err = errors.New("invalid metric type: " + m.mtype)
+		return fmt.Errorf("invalid metric type: %s", m.mtype)
 	}
 
-	return err
+	return nil
 }
 
-func update(res http.ResponseWriter, req *http.Request) {
+func saveMetric(res http.ResponseWriter, req *http.Request) {
 	switch m := parsePath(req); m.mtype {
 	case TypeGauge:
-		v, _ := strconv.ParseFloat(m.value, 64)
+		v, err := strconv.ParseFloat(m.value, 64)
+		if err != nil {
+			panic(err) // если есть ошибка, значит не сработала проверка выше
+		}
 		storage.PutGauge(m.name, v)
 	case TypeCounter:
-		v, _ := strconv.ParseInt(m.value, 10, 64)
+		v, err := strconv.ParseInt(m.value, 10, 64)
+		if err != nil {
+			panic(err) // если есть ошибка, значит не сработала проверка выше
+		}
 		storage.PutCounter(m.name, v)
 	}
+
+	res.WriteHeader(http.StatusOK)
 }

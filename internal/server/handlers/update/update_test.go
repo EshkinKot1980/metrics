@@ -36,7 +36,7 @@ func TestNew(t *testing.T) {
 		want want
 	}{
 		{
-			name: "positive counter test",
+			name: "positive_counter",
 			req: request{
 				path: "/update/counter/TestCounter/1",
 				values: pathValues{
@@ -52,7 +52,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "negative counter test",
+			name: "negative_counter",
 			req: request{
 				path: "/update/counter/TestCounter/3.14",
 				values: pathValues{
@@ -64,11 +64,11 @@ func TestNew(t *testing.T) {
 			},
 			want: want{
 				code: http.StatusBadRequest,
-				body: "invalid metric value, counter must be int64",
+				body: "invalid metric value, counter must be int64, given: 3.14",
 			},
 		},
 		{
-			name: "positive gauge test",
+			name: "positive_gauge",
 			req: request{
 				path: "/update/gauge/TestGauge/3.14",
 				values: pathValues{
@@ -84,7 +84,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "negative gauge test",
+			name: "negative_gauge",
 			req: request{
 				path: "/update/gauge/TestGauge/wtf",
 				values: pathValues{
@@ -96,11 +96,11 @@ func TestNew(t *testing.T) {
 			},
 			want: want{
 				code: http.StatusBadRequest,
-				body: "invalid metric value, gauge must be float64",
+				body: "invalid metric value, gauge must be float64, given: wtf",
 			},
 		},
 		{
-			name: "negative metric type test",
+			name: "negative_metric_type",
 			req: request{
 				path: "/update/unknown/TestUnknown/1",
 				values: pathValues{
@@ -133,9 +133,13 @@ func TestNew(t *testing.T) {
 			res := w.Result()
 			defer res.Body.Close()
 
-			assert.Equal(t, test.want.code, res.StatusCode)
-			resBody, _ := io.ReadAll(res.Body)
-			assert.Equal(t, test.want.body, strings.TrimSuffix(string(resBody), "\n"))
+			assert.Equal(t, test.want.code, res.StatusCode, "Response status code")
+			resBody, err := io.ReadAll(res.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := strings.TrimSuffix(string(resBody), "\n")
+			assert.Equal(t, test.want.body, body, "Response body")
 		})
 	}
 }
