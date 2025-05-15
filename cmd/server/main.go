@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/EshkinKot1980/metrics/internal/server"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
@@ -17,11 +18,16 @@ import (
 func main() {
 	//TODO: сделать нормальный конфиг c настройками сервера
 	addr := loadAddr()
+	logger := server.MustSetupLogger()
+	defer logger.Sync()
+
 	storage := memory.New()
-	updaterHandler := update.New(storage)
-	retrieverHandler := retrieve.New(storage)
+	mvLogger := middleware.NewHTTPLogger(logger)
+	updaterHandler := update.New(storage, logger)
+	retrieverHandler := retrieve.New(storage, logger)
 	router := chi.NewRouter()
 
+	router.Use(mvLogger.Log)
 	router.Route("/update/{type}/{name}/{value}", func(r chi.Router) {
 		r.Use(middleware.ValidateMetric)
 		r.Post("/", updaterHandler.Update)

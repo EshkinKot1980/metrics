@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 )
 
 func TestNew(t *testing.T) {
@@ -107,7 +108,8 @@ func TestNew(t *testing.T) {
 	retriever := memory.New()
 	retriever.PutCounter("TestCounter", 13)
 	retriever.PutGauge("TestGauge", 3.14)
-	handler := New(retriever)
+	logger := LoggerStub{}
+	handler := New(retriever, logger)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -130,3 +132,7 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
+
+type LoggerStub struct{}
+
+func (l LoggerStub) Error(message string, err error) {}
