@@ -1,7 +1,6 @@
 package update
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -13,23 +12,25 @@ type Updater interface {
 	PutGauge(name string, value float64)
 }
 
-type UpdateHandler struct {
-	updater Updater
+type Logger interface {
+	Error(message string, err error)
 }
 
-func New(u Updater) *UpdateHandler {
-	return &UpdateHandler{updater: u}
+type UpdateHandler struct {
+	updater Updater
+	logger  Logger
+}
+
+func New(u Updater, l Logger) *UpdateHandler {
+	return &UpdateHandler{updater: u, logger: l}
 }
 
 func (h *UpdateHandler) Update(res http.ResponseWriter, req *http.Request) {
-	const op = "server.handlers.update.UpdateHandler.Update"
-
 	switch m := server.ParsePath(req); m.Mtype {
 	case server.TypeGauge:
 		v, err := strconv.ParseFloat(m.Value, 64)
 		if err != nil {
-			// TODO: Отправить ERROR в логер
-			err = fmt.Errorf("unexpected error in %s: %w", op, err)
+			h.logger.Error("unexpected error", err)
 			http.Error(res, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -37,8 +38,7 @@ func (h *UpdateHandler) Update(res http.ResponseWriter, req *http.Request) {
 	case server.TypeCounter:
 		v, err := strconv.ParseInt(m.Value, 10, 64)
 		if err != nil {
-			// TODO: Отправить ERROR в логер
-			err = fmt.Errorf("unexpected error in %s: %w", op, err)
+			h.logger.Error("unexpected error", err)
 			http.Error(res, err.Error(), http.StatusInternalServerError)
 			return
 		}
