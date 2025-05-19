@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
 type Retriever interface {
@@ -36,10 +36,10 @@ func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
 	)
 
 	switch t := req.PathValue("type"); t {
-	case server.TypeGauge:
+	case models.TypeGauge:
 		gauge, err = h.retriever.GetGauge(name)
 		body = fmt.Sprintf("%v", gauge)
-	case server.TypeCounter:
+	case models.TypeCounter:
 		counter, err = h.retriever.GetCounter(name)
 		body = fmt.Sprintf("%v", counter)
 	default:

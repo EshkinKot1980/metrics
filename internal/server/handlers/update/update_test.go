@@ -9,11 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/EshkinKot1980/metrics/internal/server/middleware"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 )
 
-func TestNew(t *testing.T) {
+func TestUpdateHandler(t *testing.T) {
 	type pathValues struct {
 		mtype string
 		name  string
@@ -119,19 +118,18 @@ func TestNew(t *testing.T) {
 	}
 
 	updater := memory.New()
-	logger := LoggerStub{}
-	handler := New(updater, logger)
+	handler := New(updater)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, test.req.path, nil)
-			req.Header.Set("content-type", test.req.contentType)
-			req.SetPathValue("type", test.req.values.mtype)
-			req.SetPathValue("name", test.req.values.name)
-			req.SetPathValue("value", test.req.values.value)
+			r := httptest.NewRequest(http.MethodPost, test.req.path, nil)
+			r.Header.Set("content-type", test.req.contentType)
+			r.SetPathValue("type", test.req.values.mtype)
+			r.SetPathValue("name", test.req.values.name)
+			r.SetPathValue("value", test.req.values.value)
 
 			w := httptest.NewRecorder()
-			middleware.ValidateMetric(http.HandlerFunc(handler.Update)).ServeHTTP(w, req)
+			handler.Update(w, r)
 			res := w.Result()
 			defer res.Body.Close()
 
@@ -145,7 +143,3 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
-
-type LoggerStub struct{}
-
-func (l LoggerStub) Error(message string, err error) {}

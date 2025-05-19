@@ -1,10 +1,9 @@
 package client
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,26 +11,20 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
-func testRequest(req *http.Request) func(t *testing.T) {
+func testRequest(r *http.Request) func(t *testing.T) {
 	return func(t *testing.T) {
-		assert.Equal(t, http.MethodPost, req.Method, "Request method")
-		assert.Equal(t, ContentType, req.Header.Get("Content-Type"), "Request Content-Type header")
+		assert.Equal(t, http.MethodPost, r.Method, "Request method")
+		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
+		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
 
-		pathParts := strings.Split(req.URL.Path, "/")
-		require.Equal(t, 5, len(pathParts), "Split path count")
-		assert.Equal(t, PathPrefix, pathParts[1], "Path prefix")
-		require.Contains(t, []string{TypeCounter, TypeGauge}, pathParts[2], "Metric type")
-
-		switch pathParts[2] {
-		case TypeGauge:
-			_, err := strconv.ParseFloat(pathParts[4], 64)
-			assert.Nil(t, err, "Check gauge value")
-		case TypeCounter:
-			_, err := strconv.ParseInt(pathParts[4], 10, 64)
-			assert.Nil(t, err, "Check counter value")
-		}
+		var metric models.Metrics
+		err := json.NewDecoder(r.Body).Decode(&metric)
+		require.Nil(t, err, "Request Body decoding")
+		err = metric.Validate()
+		assert.Nil(t, err, "Metric data validation")
 	}
 }
 
@@ -46,9 +39,9 @@ func TestReport(t *testing.T) {
 }
 
 func makeHadler(t *testing.T) http.Handler {
-	fn := func(res http.ResponseWriter, req *http.Request) {
-		name := "report_path:" + req.URL.Path
-		t.Run(name, testRequest(req))
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		name := "report_test"
+		t.Run(name, testRequest(r))
 	}
 
 	return http.HandlerFunc(fn)
