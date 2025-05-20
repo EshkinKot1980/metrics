@@ -7,13 +7,12 @@ import (
 	"github.com/go-resty/resty/v2"
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
 const (
-	TypeGauge   = "gauge"
-	TypeCounter = "counter"
-	PathPrefix  = "update"
-	ContentType = "text/plain"
+	Path        = "/update"
+	ContentType = "application/json"
 )
 
 type Retriever interface {
@@ -32,33 +31,35 @@ func New(r Retriever, serverAddr string) *HTTPClient {
 		address:   serverAddr,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
-			SetBaseURL(serverAddr+"/"+PathPrefix).
-			SetHeader("Content-Type", "text/plain"),
+			SetBaseURL(serverAddr).
+			SetHeader("Content-Type", ContentType),
 	}
 }
 
 func (c *HTTPClient) Report() {
-	params := make(map[string]string)
+	// params := make(map[string]string)
+	var metric models.Metrics
 	counters, gauges := c.retriever.Pull()
 
-	params["type"] = TypeCounter
+	metric.MType = models.TypeCounter
 	for _, m := range counters {
-		params["name"] = m.Name
-		params["value"] = fmt.Sprintf("%v", m.Value)
-		c.sendMetric(params)
+		metric.ID = m.Name
+		metric.Delta = &m.Value
+		c.sendMetric(metric)
 	}
 
-	params["type"] = TypeGauge
+	metric.MType = models.TypeGauge
+	metric.Delta = nil
 	for _, m := range gauges {
-		params["name"] = m.Name
-		params["value"] = fmt.Sprintf("%v", m.Value)
-		c.sendMetric(params)
+		metric.ID = m.Name
+		metric.Value = &m.Value
+		c.sendMetric(metric)
 	}
 }
 
-func (c *HTTPClient) sendMetric(params map[string]string) {
-	req := c.client.R().SetPathParams(params)
-	resp, err := req.Post("/{type}/{name}/{value}")
+func (c *HTTPClient) sendMetric(metric models.Metrics) {
+	req := c.client.R().SetBody(metric)
+	resp, err := req.Post(Path)
 
 	if err != nil {
 		//TODO: заменить на логер

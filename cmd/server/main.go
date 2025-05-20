@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/EshkinKot1980/metrics/internal/server"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
@@ -17,16 +18,26 @@ import (
 func main() {
 	//TODO: сделать нормальный конфиг c настройками сервера
 	addr := loadAddr()
-	storage := memory.New()
-	updaterHandler := update.New(storage)
-	retrieverHandler := retrieve.New(storage)
-	router := chi.NewRouter()
+	logger := server.MustSetupLogger()
+	defer logger.Sync()
 
-	router.Route("/update/{type}/{name}/{value}", func(r chi.Router) {
-		r.Use(middleware.ValidateMetric)
-		r.Post("/", updaterHandler.Update)
+	storage := memory.New()
+	mvLogger := middleware.NewHTTPLogger(logger)
+	updaterHandler := update.New(storage)
+	updaterJSONHandler := update.NewJSONHandler(storage, logger)
+	retrieverHandler := retrieve.New(storage, logger)
+	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
+
+	router := chi.NewRouter()
+	router.Use(mvLogger.Log)
+	router.Route("/update", func(r chi.Router) {
+		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
+		r.Post("/", updaterJSONHandler.Update)
 	})
-	router.Get("/value/{type}/{name}", retrieverHandler.Retrieve)
+	router.Route("/value", func(r chi.Router) {
+		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
+		r.Post("/", retrieverJSONHandler.Retrieve)
+	})
 
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
