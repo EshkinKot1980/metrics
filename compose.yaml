@@ -12,4 +12,4 @@ services:
       - /etc/shadow:/etc/shadow:ro
     ports:
       - 8080:8080
-    command: go run cmd/server/main.go -a :8080
+    command: go run cmd/server/main.go -a :8080 -i 30 -r
