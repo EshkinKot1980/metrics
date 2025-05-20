@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/server/handlers/info"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
@@ -30,6 +31,7 @@ func main() {
 
 	router := chi.NewRouter()
 	router.Use(mvLogger.Log)
+	router.Use(middleware.GzipWrapper)
 	router.Route("/update", func(r chi.Router) {
 		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
 		r.Post("/", updaterJSONHandler.Update)
@@ -38,6 +40,7 @@ func main() {
 		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
 		r.Post("/", retrieverJSONHandler.Retrieve)
 	})
+	router.Get("/", info.InfoPage)
 
 	err := http.ListenAndServe(addr, router)
 	if err != nil {

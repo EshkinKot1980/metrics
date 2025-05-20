@@ -34,7 +34,7 @@ func TestReport(t *testing.T) {
 
 	storage := storage.New()
 	initStorage(storage)
-	client := New(storage, server.URL)
+	client := New(storage, server.URL, false)
 	client.Report()
 }
 
