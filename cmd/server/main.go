@@ -1,10 +1,12 @@
 package main
 
 import (
-	"flag"
+	"context"
 	"log"
 	"net/http"
-	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -13,16 +15,20 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
-	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
+	"github.com/EshkinKot1980/metrics/internal/server/storage/file"
 )
 
 func main() {
-	//TODO: сделать нормальный конфиг c настройками сервера
-	addr := loadAddr()
+	config := server.MustLoadConfig()
 	logger := server.MustSetupLogger()
 	defer logger.Sync()
 
-	storage := memory.New()
+	storage, err := file.New(config.StorageCfg, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer storage.Halt()
+
 	mvLogger := middleware.NewHTTPLogger(logger)
 	updaterHandler := update.New(storage)
 	updaterJSONHandler := update.NewJSONHandler(storage, logger)
@@ -41,22 +47,33 @@ func main() {
 		r.Post("/", retrieverJSONHandler.Retrieve)
 	})
 	router.Get("/", info.InfoPage)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	err := http.ListenAndServe(addr, router)
-	if err != nil {
-		log.Fatal(err)
-	}
+	runServer(ctx, config.ServerAddr, router)
 }
 
-func loadAddr() string {
-	var addr string
-	flag.StringVar(&addr, "a", "localhost:8080", "address to serve")
+func runServer(ctx context.Context, addr string, router *chi.Mux) {
+	srv := &http.Server{Addr: addr, Handler: router}
 
-	flag.Parse()
+	go func() {
+		err := srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
 
-	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
-		addr = envAddr
+	log.Printf("server listening on %s\n", addr)
+
+	<-ctx.Done()
+	log.Println("shutting down server gracefully")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Println(err)
 	}
 
-	return addr
+	<-shutdownCtx.Done()
+	log.Println("server stopped")
 }
