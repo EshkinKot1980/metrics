@@ -18,10 +18,11 @@ func New() *MemoryStorage {
 	}
 }
 
-func (s *MemoryStorage) PutCounter(name string, incriment int64) {
+func (s *MemoryStorage) PutCounter(name string, increment int64) int64 {
 	s.cmx.Lock()
 	defer s.cmx.Unlock()
-	s.counters[name] += incriment
+	s.counters[name] += increment
+	return s.counters[name]
 }
 
 func (s *MemoryStorage) PutGauge(name string, value float64) {
