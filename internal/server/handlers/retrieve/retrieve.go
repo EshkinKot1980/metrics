@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
 type Retriever interface {
@@ -13,16 +13,20 @@ type Retriever interface {
 	GetGauge(name string) (float64, error)
 }
 
-type ValueHandler struct {
-	retriever Retriever
+type Logger interface {
+	Error(message string, err error)
 }
 
-func New(r Retriever) *ValueHandler {
-	return &ValueHandler{retriever: r}
+type ValueHandler struct {
+	retriever Retriever
+	logger    Logger
+}
+
+func New(r Retriever, l Logger) *ValueHandler {
+	return &ValueHandler{retriever: r, logger: l}
 }
 
 func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
-	const op = "server.handlers.update.ValueHandler.Retrieve"
 	var (
 		name    = req.PathValue("name")
 		gauge   float64
@@ -32,10 +36,10 @@ func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
 	)
 
 	switch t := req.PathValue("type"); t {
-	case server.TypeGauge:
+	case models.TypeGauge:
 		gauge, err = h.retriever.GetGauge(name)
 		body = fmt.Sprintf("%v", gauge)
-	case server.TypeCounter:
+	case models.TypeCounter:
 		counter, err = h.retriever.GetCounter(name)
 		body = fmt.Sprintf("%v", counter)
 	default:
@@ -49,8 +53,7 @@ func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
 
 	_, err = res.Write([]byte(body))
 	if err != nil {
-		// TODO: Отправить ERROR в логер
-		err = fmt.Errorf("unexpected error in %s: %w", op, err)
+		h.logger.Error("unexpected error", err)
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 	}
 }
