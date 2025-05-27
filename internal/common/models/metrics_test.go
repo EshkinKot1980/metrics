@@ -1,58 +1,60 @@
-package server
+package models
 
 import (
 	"errors"
 	"testing"
 )
 
-func TestMetric_Validate(t *testing.T) {
+func TestMetrics_Validate(t *testing.T) {
+	delta := int64(13)
+	value := 3.1415
+
 	tests := []struct {
 		name   string
-		metric Metric
+		metric Metrics
 		err    error
 	}{
 		{
 			name: "positive_counter",
-			metric: Metric{
-				Mtype: TypeCounter,
-				Name:  "TestCounter",
-				Value: "13",
+			metric: Metrics{
+				ID:    "TestCounter",
+				MType: TypeCounter,
+				Delta: &delta,
 			},
 			err: nil,
 		},
 		{
 			name: "negative_counter",
-			metric: Metric{
-				Mtype: TypeCounter,
-				Name:  "TestCounter",
-				Value: "3.1415",
+			metric: Metrics{
+				ID:    "TestCounter",
+				MType: TypeCounter,
 			},
-			err: errors.New("invalid metric value, counter must be int64, given: 3.1415"),
+			err: errors.New("counter metric must contain int64 \"delta\" field"),
 		},
 		{
 			name: "positive_gauge",
-			metric: Metric{
-				Mtype: TypeGauge,
-				Name:  "TestGauge",
-				Value: "3.1415",
+			metric: Metrics{
+				ID:    "TestGauge",
+				MType: TypeGauge,
+				Value: &value,
 			},
 			err: nil,
 		},
 		{
 			name: "negative_gauge",
-			metric: Metric{
-				Mtype: TypeGauge,
-				Name:  "TestGauge",
-				Value: "wtf",
+			metric: Metrics{
+				ID:    "TestGauge",
+				MType: TypeGauge,
 			},
-			err: errors.New("invalid metric value, gauge must be float64, given: wtf"),
+			err: errors.New("gauge metric must contain float64 \"value\" field"),
 		},
 		{
 			name: "negative_metric_type",
-			metric: Metric{
-				Mtype: "unknown",
-				Name:  "TestUnknown",
-				Value: "1",
+			metric: Metrics{
+				ID:    "TestUnknown",
+				MType: "unknown",
+				Delta: &delta,
+				Value: &value,
 			},
 			err: errors.New("invalid metric type: unknown"),
 		},
