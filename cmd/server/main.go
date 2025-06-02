@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os/signal"
@@ -9,9 +10,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/EshkinKot1980/metrics/internal/server"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/info"
+	"github.com/EshkinKot1980/metrics/internal/server/handlers/ping"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
@@ -23,7 +26,18 @@ func main() {
 	logger := server.MustSetupLogger()
 	defer logger.Sync()
 
-	storage, err := file.New(config.StorageCfg, logger)
+	db, err := sql.Open("pgx", config.DatabaseDSN)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if config.DatabaseDSN != "" {
+		if err := db.Ping(); err != nil {
+			log.Fatal(err)
+		}
+	} 
+
+	storage, err := file.New(config.FileCfg, logger)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,6 +48,7 @@ func main() {
 	updaterJSONHandler := update.NewJSONHandler(storage, logger)
 	retrieverHandler := retrieve.New(storage, logger)
 	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
+	pingHandler := ping.New(db)
 
 	router := chi.NewRouter()
 	router.Use(mvLogger.Log)
@@ -46,6 +61,7 @@ func main() {
 		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
 		r.Post("/", retrieverJSONHandler.Retrieve)
 	})
+	router.Get("/ping", pingHandler.Ping)
 	router.Get("/", info.InfoPage)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

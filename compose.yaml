@@ -3,6 +3,8 @@ services:
     container_name: go-advaced-metrics-server
     build: 
       context: ./docker/go
+    depends_on:
+      - postgres-db
     user: 1000:1000
     volumes:
       - .:/go/app
@@ -12,4 +14,29 @@ services:
       - /etc/shadow:/etc/shadow:ro
     ports:
       - 8080:8080
-    command: go run cmd/server/main.go -a :8080 -i 30 -r
+    networks:
+      - metrics
+    command: go run cmd/server/main.go -a :8080 -i 30 -r -d postgresss://metrics_usr:password@postgres-db:5432/metrics
+
+  postgres-db:
+      container_name: go-advaced-metrics-postgres-db
+      working_dir: /app
+      image: postgres:13.0-alpine
+      environment:
+          POSTGRES_USER: metrics_usr
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: metrics
+      ports:
+          - '5432:5432'
+      networks:
+          - metrics
+      volumes:
+          - server-postgres:/var/lib/postgresql/data
+
+networks:
+  metrics:
+      name: metrics
+      driver: bridge
+
+volumes:
+  server-postgres:
