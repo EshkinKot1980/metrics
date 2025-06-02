@@ -12,7 +12,7 @@ import (
 func main() {
 	cfg := agent.MustLoadConfig()
 	s := storage.New()
-	c := client.New(s, cfg.BaseURL)
+	c := client.New(s, cfg.BaseURL, true)
 	m := monitor.New(s)
 
 	go func() {

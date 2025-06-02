@@ -19,6 +19,10 @@ cmd/server/server
 metricstest
 statictest
 
+# App data
+storage/server/*
+!storage/server/.gitkeep
+
 # Dependency directories (remove the comment below to include it)
 vendor/
 
