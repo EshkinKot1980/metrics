@@ -30,7 +30,7 @@ func MustLoadConfig() *Config {
 
 	flag.StringVar(&a, "a", "localhost:8080", "address to serve")
 	flag.StringVar(&d, "d", "", "database dsn")
-	flag.StringVar(&f, "f", "storage/server/metrics.json", "file storage path")
+	flag.StringVar(&f, "f", "data/server/metrics.json", "file storage path")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
 
