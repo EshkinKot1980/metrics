@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os/signal"
@@ -9,13 +10,16 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/EshkinKot1980/metrics/internal/server"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/info"
+	"github.com/EshkinKot1980/metrics/internal/server/handlers/ping"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/file"
+	"github.com/EshkinKot1980/metrics/internal/server/storage/pg"
 )
 
 func main() {
@@ -23,21 +27,23 @@ func main() {
 	logger := server.MustSetupLogger()
 	defer logger.Sync()
 
-	storage, err := file.New(config.StorageCfg, logger)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer storage.Halt()
+	storage, db := initStorage(config, logger)
+	defer func() {
+		storage.Halt()
+		db.Close()
+	}()
 
 	mvLogger := middleware.NewHTTPLogger(logger)
-	updaterHandler := update.New(storage)
+	updaterHandler := update.New(storage, logger)
 	updaterJSONHandler := update.NewJSONHandler(storage, logger)
 	retrieverHandler := retrieve.New(storage, logger)
 	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
+	pingHandler := ping.New(db)
 
 	router := chi.NewRouter()
 	router.Use(mvLogger.Log)
 	router.Use(middleware.GzipWrapper)
+
 	router.Route("/update", func(r chi.Router) {
 		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
 		r.Post("/", updaterJSONHandler.Update)
@@ -46,6 +52,7 @@ func main() {
 		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
 		r.Post("/", retrieverJSONHandler.Retrieve)
 	})
+	router.Get("/ping", pingHandler.Ping)
 	router.Get("/", info.InfoPage)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -76,4 +83,39 @@ func runServer(ctx context.Context, addr string, router *chi.Mux) {
 
 	<-shutdownCtx.Done()
 	log.Println("server stopped")
+}
+
+type Storage interface {
+	Halt()
+	PutCounter(name string, increment int64) (int64, error)
+	PutGauge(name string, value float64) error
+	GetCounter(name string) (int64, error)
+	GetGauge(name string) (float64, error)
+}
+
+func initStorage(config *server.Config, logger *server.Logger) (Storage, *sql.DB) {
+	db, err := sql.Open("pgx", config.DatabaseDSN)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if config.DatabaseDSN != "" {
+		if err := db.Ping(); err != nil {
+			log.Fatal(err)
+		}
+
+		storage, err := pg.New(db)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return storage, db
+	}
+
+	storage, err := file.New(config.FileCfg, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return storage, db
 }

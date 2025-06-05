@@ -100,7 +100,7 @@ func TestNew(t *testing.T) {
 			},
 			want: want{
 				code: http.StatusNotFound,
-				body: "invalid metric type: unknown",
+				body: "invalid metric type",
 			},
 		},
 	}
