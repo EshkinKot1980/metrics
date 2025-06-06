@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
+	"log"
+	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -18,21 +19,22 @@ const (
 	ContentType = "application/json"
 )
 
-type Retriever interface {
+type Storage interface {
 	Pull() ([]agent.Counter, []agent.Gauge)
+	Put(c []agent.Counter, g []agent.Gauge)
 }
 
 type HTTPClient struct {
-	retriever Retriever
-	address   string
-	client    *resty.Client
+	storage Storage
+	address string
+	client  *resty.Client
+	mx      sync.Mutex
 }
 
-// TODO: выпилить needCompress после того как доделаю тесты
-func New(r Retriever, serverAddr string) *HTTPClient {
+func New(s Storage, serverAddr string) *HTTPClient {
 	return &HTTPClient{
-		retriever: r,
-		address:   serverAddr,
+		storage: s,
+		address: serverAddr,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
@@ -44,8 +46,13 @@ func New(r Retriever, serverAddr string) *HTTPClient {
 }
 
 func (c *HTTPClient) Report() {
+	if !c.mx.TryLock() {
+		return
+	}
+	defer c.mx.Unlock()
+
 	var metric models.Metrics
-	counters, gauges := c.retriever.Pull()
+	counters, gauges := c.storage.Pull()
 	metrics := make([]models.Metrics, 0, len(counters)+len(gauges))
 
 	metric.MType = models.TypeCounter
@@ -63,27 +70,46 @@ func (c *HTTPClient) Report() {
 		metrics = append(metrics, metric)
 	}
 
-	c.sendMetric(metrics)
-}
-
-func (c *HTTPClient) sendMetric(metric []models.Metrics) {
-	req := c.client.R().SetBody(metric)
-	resp, err := req.Post(Path)
-
-	if err != nil {
-		//TODO: заменить на логер
-		fmt.Println(err.Error())
+	if len(metrics) == 0 {
 		return
 	}
 
-	if !resp.IsSuccess() {
-		//TODO: заменить на логер
-		fmt.Println(req.URL)
-		fmt.Println("Code:", resp.StatusCode(), "Body:", resp)
+	if !c.sendMetric(metrics) {
+		c.storage.Put(counters, []agent.Gauge{})
 	}
 }
 
-// after countless frustrations and tears i suddenly found the way
+func (c *HTTPClient) sendMetric(metric []models.Metrics) bool {
+	retries := []int{1, 3, 5}
+	i := 0
+	for {
+		succes, retry := true, false
+		req := c.client.R().SetBody(metric)
+		resp, err := req.Post(Path)
+
+		if err != nil {
+			log.Print(err)
+			succes, retry = false, true
+		} else if !resp.IsSuccess() {
+			log.Print("Code: ", resp.StatusCode(), " Body: ", resp)
+			succes = false
+
+			if resp.StatusCode() == 500 {
+				retry = true
+			}
+		}
+
+		if !retry || i >= len(retries) {
+			return succes
+		}
+
+		interval := time.Duration(retries[i]) * time.Second
+		<-time.After(interval)
+		i++
+	}
+
+}
+
 func gzipWrapper(c *resty.Client, r *resty.Request) error {
 	var body bytes.Buffer
 
