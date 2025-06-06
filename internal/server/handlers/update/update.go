@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
@@ -43,6 +44,12 @@ func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
+		valueToLong := "value too long for type character varying(32)"
+		if strings.Contains(err.Error(), valueToLong) {
+			http.Error(w, "id is too long, maximum 32 characters", http.StatusBadRequest)
+			return
+		}
+
 		h.logger.Error("failed to save metric", err)
 		http.Error(w, "failed to save metric", http.StatusInternalServerError)
 		return

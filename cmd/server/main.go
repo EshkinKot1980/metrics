@@ -17,7 +17,9 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/ping"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
 	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
+	"github.com/EshkinKot1980/metrics/internal/server/handlers/updates"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
+	"github.com/EshkinKot1980/metrics/internal/server/storage"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/file"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/pg"
 )
@@ -27,36 +29,16 @@ func main() {
 	logger := server.MustSetupLogger()
 	defer logger.Sync()
 
-	storage, db := initStorage(config, logger)
+	storage, db := mustSetupStorage(config, logger)
 	defer func() {
 		storage.Halt()
 		db.Close()
 	}()
 
-	mvLogger := middleware.NewHTTPLogger(logger)
-	updaterHandler := update.New(storage, logger)
-	updaterJSONHandler := update.NewJSONHandler(storage, logger)
-	retrieverHandler := retrieve.New(storage, logger)
-	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
-	pingHandler := ping.New(db)
-
-	router := chi.NewRouter()
-	router.Use(mvLogger.Log)
-	router.Use(middleware.GzipWrapper)
-
-	router.Route("/update", func(r chi.Router) {
-		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
-		r.Post("/", updaterJSONHandler.Update)
-	})
-	router.Route("/value", func(r chi.Router) {
-		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
-		r.Post("/", retrieverJSONHandler.Retrieve)
-	})
-	router.Get("/ping", pingHandler.Ping)
-	router.Get("/", info.InfoPage)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	router := setupRouter(storage, logger, db)
 	runServer(ctx, config.ServerAddr, router)
 }
 
@@ -85,15 +67,37 @@ func runServer(ctx context.Context, addr string, router *chi.Mux) {
 	log.Println("server stopped")
 }
 
-type Storage interface {
-	Halt()
-	PutCounter(name string, increment int64) (int64, error)
-	PutGauge(name string, value float64) error
-	GetCounter(name string) (int64, error)
-	GetGauge(name string) (float64, error)
+func setupRouter(storage storage.Storage, logger *server.Logger, db *sql.DB) *chi.Mux {
+	mvLogger := middleware.NewHTTPLogger(logger)
+	updaterHandler := update.New(storage, logger)
+	updaterJSONHandler := update.NewJSONHandler(storage, logger)
+	updaterBatchHandler := updates.New(storage, logger)
+	retrieverHandler := retrieve.New(storage, logger)
+	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
+	pingHandler := ping.New(db)
+
+	router := chi.NewRouter()
+	router.Use(mvLogger.Log)
+	router.Use(middleware.GzipWrapper)
+
+	router.Route("/update", func(r chi.Router) {
+		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
+		r.Post("/", updaterJSONHandler.Update)
+	})
+	router.Route("/updates", func(r chi.Router) {
+		r.Post("/", updaterBatchHandler.Update)
+	})
+	router.Route("/value", func(r chi.Router) {
+		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
+		r.Post("/", retrieverJSONHandler.Retrieve)
+	})
+	router.Get("/ping", pingHandler.Ping)
+	router.Get("/", info.InfoPage)
+
+	return router
 }
 
-func initStorage(config *server.Config, logger *server.Logger) (Storage, *sql.DB) {
+func mustSetupStorage(config *server.Config, logger *server.Logger) (storage.Storage, *sql.DB) {
 	db, err := sql.Open("pgx", config.DatabaseDSN)
 	if err != nil {
 		log.Fatal(err)

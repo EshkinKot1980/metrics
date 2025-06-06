@@ -1,11 +1,13 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 	"github.com/EshkinKot1980/metrics/internal/server"
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
@@ -56,6 +58,31 @@ func (s *FileStorage) PutGauge(name string, value float64) error {
 	}()
 
 	s.gauges[name] = value
+	return nil
+}
+
+func (s *FileStorage) PutMetrics(ctx context.Context, metrics []models.Metrics) error {
+	s.cmx.Lock()
+	defer func() {
+		s.sync()
+		s.cmx.Unlock()
+	}()
+
+	for _, m := range metrics {
+		if err := m.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for _, m := range metrics {
+		switch m.MType {
+		case models.TypeGauge:
+			s.gauges[m.ID] = *m.Value
+		case models.TypeCounter:
+			s.counters[m.ID] += *m.Delta
+		}
+	}
+
 	return nil
 }
 

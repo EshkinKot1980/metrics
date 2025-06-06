@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Path        = "/update"
+	Path        = "/updates"
 	ContentType = "application/json"
 )
 
@@ -29,36 +29,30 @@ type HTTPClient struct {
 }
 
 // TODO: выпилить needCompress после того как доделаю тесты
-func New(r Retriever, serverAddr string, needCompress bool) *HTTPClient {
-	c := HTTPClient{
+func New(r Retriever, serverAddr string) *HTTPClient {
+	return &HTTPClient{
 		retriever: r,
 		address:   serverAddr,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
 			SetHeader("Content-Type", ContentType).
-			SetHeader("Accept-Encoding", "gzip"),
-	}
-
-	if needCompress {
-		c.client.
+			SetHeader("Accept-Encoding", "gzip").
 			SetHeader("Content-Encoding", "gzip").
-			OnBeforeRequest(gzipWrapper)
+			OnBeforeRequest(gzipWrapper),
 	}
-
-	return &c
 }
 
 func (c *HTTPClient) Report() {
-	// params := make(map[string]string)
 	var metric models.Metrics
 	counters, gauges := c.retriever.Pull()
+	metrics := make([]models.Metrics, 0, len(counters)+len(gauges))
 
 	metric.MType = models.TypeCounter
 	for _, m := range counters {
 		metric.ID = m.Name
 		metric.Delta = &m.Value
-		c.sendMetric(metric)
+		metrics = append(metrics, metric)
 	}
 
 	metric.MType = models.TypeGauge
@@ -66,11 +60,13 @@ func (c *HTTPClient) Report() {
 	for _, m := range gauges {
 		metric.ID = m.Name
 		metric.Value = &m.Value
-		c.sendMetric(metric)
+		metrics = append(metrics, metric)
 	}
+
+	c.sendMetric(metrics)
 }
 
-func (c *HTTPClient) sendMetric(metric models.Metrics) {
+func (c *HTTPClient) sendMetric(metric []models.Metrics) {
 	req := c.client.R().SetBody(metric)
 	resp, err := req.Post(Path)
 

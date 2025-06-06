@@ -1,7 +1,10 @@
 package client
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,14 +20,26 @@ import (
 func testRequest(r *http.Request) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
-		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
 		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
+		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
+		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip", "Request Accept-Encoding header")
+		require.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
 
-		var metric models.Metrics
-		err := json.NewDecoder(r.Body).Decode(&metric)
+		gz, err := gzip.NewReader(r.Body)
+		require.Nil(t, err, "Request Body decompressing: creating reader)")
+		defer gz.Close()
+
+		body, err := io.ReadAll(gz)
+		require.Nil(t, err, "Request Body decompressing: reading body")
+
+		var metrics []models.Metrics
+		bodyReader := bytes.NewReader(body)
+		err = json.NewDecoder(bodyReader).Decode(&metrics)
 		require.Nil(t, err, "Request Body decoding")
-		err = metric.Validate()
-		assert.Nil(t, err, "Metric data validation")
+
+		for _, m := range metrics {
+			assert.Nil(t, m.Validate(), "Metric "+m.ID+" data validation")
+		}
 	}
 }
 
@@ -34,7 +49,7 @@ func TestReport(t *testing.T) {
 
 	storage := storage.New()
 	initStorage(storage)
-	client := New(storage, server.URL, false)
+	client := New(storage, server.URL)
 	client.Report()
 }
 

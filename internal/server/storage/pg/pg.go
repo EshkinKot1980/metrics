@@ -1,9 +1,11 @@
 package pg
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
+	"github.com/EshkinKot1980/metrics/internal/common/models"
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
 
@@ -22,7 +24,7 @@ const (
 			VALUES($1, $2)
 		ON CONFLICT (id)
 		DO UPDATE SET
-			delta = EXCLUDED.delta + $2
+			delta = EXCLUDED.delta + counters.delta
 		RETURNING delta`
 	upsertGaugeQuery = `
 		INSERT INTO gauges (id, value)
@@ -71,6 +73,40 @@ func (s *DBStorage) GetGauge(name string) (float64, error) {
 		err = storage.ErrGaugeNotFound
 	}
 	return value, err
+}
+
+func (s *DBStorage) PutMetrics(ctx context.Context, metrics []models.Metrics) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range metrics {
+		var err error
+
+		if err = m.Validate(); err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		switch m.MType {
+		case models.TypeGauge:
+			_, err = s.db.Exec(upsertGaugeQuery, m.ID, *m.Value)
+		case models.TypeCounter:
+			_, err = s.db.Exec(upsertCounterQuery, m.ID, *m.Delta)
+		}
+
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *DBStorage) Halt() {
