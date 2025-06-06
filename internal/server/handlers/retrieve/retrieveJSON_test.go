@@ -61,7 +61,7 @@ func TestValueJSONHandler(t *testing.T) {
 			reqBody: `{"id":"TestUnknown","type":"unknown"}`,
 			want: want{
 				code: http.StatusNotFound,
-				body: "invalid metric type: unknown",
+				body: "invalid metric type",
 			},
 		},
 	}
