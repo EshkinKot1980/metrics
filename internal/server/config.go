@@ -17,20 +17,22 @@ type FileStorageConfig struct {
 type Config struct {
 	DatabaseDSN string
 	ServerAddr  string
+	SecretKey   string
 	FileCfg     FileStorageConfig
 }
 
 func MustLoadConfig() *Config {
 	var (
-		a, d, f string
-		i       uint64
-		r       bool
-		err     error
+		a, d, f, k string
+		i          uint64
+		r          bool
+		err        error
 	)
 
 	flag.StringVar(&a, "a", "localhost:8080", "address to serve")
 	flag.StringVar(&d, "d", "", "database dsn")
 	flag.StringVar(&f, "f", "data/server/metrics.json", "file storage path")
+	flag.StringVar(&k, "k", "", "secret key")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
 
@@ -46,6 +48,10 @@ func MustLoadConfig() *Config {
 
 	if envPath := os.Getenv("FILE_STORAGE_PATH"); envPath != "" {
 		f = envPath
+	}
+
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		k = envKey
 	}
 
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
@@ -65,6 +71,7 @@ func MustLoadConfig() *Config {
 	return &Config{
 		DatabaseDSN: d,
 		ServerAddr:  a,
+		SecretKey:   k,
 		FileCfg: FileStorageConfig{
 			Interval: i,
 			Path:     f,
