@@ -16,7 +16,7 @@ services:
       - 8080:8080
     networks:
       - metrics
-    command: go run cmd/server/main.go -a :8080 -i 30 -r -d postgres://metrics_usr:password@postgres-db:5432/metrics
+    command: go run cmd/server/main.go -a :8080 -i 30 -r -d postgres://metrics_usr:password@postgres-db:5432/metrics -k secret
 
   postgres-db:
       container_name: go-advaced-metrics-postgres-db

@@ -38,7 +38,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	router := setupRouter(storage, logger, db)
+	router := setupRouter(config, storage, logger, db)
 	runServer(ctx, config.ServerAddr, router)
 }
 
@@ -67,8 +67,9 @@ func runServer(ctx context.Context, addr string, router *chi.Mux) {
 	log.Println("server stopped")
 }
 
-func setupRouter(storage storage.Storage, logger *server.Logger, db *sql.DB) *chi.Mux {
-	mvLogger := middleware.NewHTTPLogger(logger)
+func setupRouter(config *server.Config, storage storage.Storage, logger *server.Logger, db *sql.DB) *chi.Mux {
+	mwLogger := middleware.NewHTTPLogger(logger)
+	mwHashHeader := middleware.NewHashHeader(config.SecretKey)
 	updaterHandler := update.New(storage, logger)
 	updaterJSONHandler := update.NewJSONHandler(storage, logger)
 	updaterBatchHandler := updates.New(storage, logger)
@@ -77,21 +78,25 @@ func setupRouter(storage storage.Storage, logger *server.Logger, db *sql.DB) *ch
 	pingHandler := ping.New(db)
 
 	router := chi.NewRouter()
-	router.Use(mvLogger.Log)
+	router.Use(mwLogger.Log)
 	router.Use(middleware.GzipWrapper)
+	router.Use(mwHashHeader.Sign)
 
 	router.Route("/update", func(r chi.Router) {
 		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
 		r.Post("/", updaterJSONHandler.Update)
 	})
 	router.Route("/updates", func(r chi.Router) {
+		r.Use(mwHashHeader.Validate)
 		r.Post("/", updaterBatchHandler.Update)
 	})
 	router.Route("/value", func(r chi.Router) {
 		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
 		r.Post("/", retrieverJSONHandler.Retrieve)
 	})
-	router.Get("/ping", pingHandler.Ping)
+	router.Route("/ping", func(r chi.Router) {
+		r.Get("/", pingHandler.Ping)
+	})
 	router.Get("/", info.InfoPage)
 
 	return router

@@ -3,6 +3,9 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -23,7 +26,7 @@ func testRequest(r *http.Request) func(t *testing.T) {
 		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
 		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
 		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip", "Request Accept-Encoding header")
-		require.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
+		assert.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
 
 		gz, err := gzip.NewReader(r.Body)
 		require.Nil(t, err, "Request Body decompressing: creating reader)")
@@ -40,6 +43,14 @@ func testRequest(r *http.Request) func(t *testing.T) {
 		for _, m := range metrics {
 			assert.Nil(t, m.Validate(), "Metric "+m.ID+" data validation")
 		}
+
+		requestHash := r.Header.Get("HashSHA256")
+		assert.NotEmpty(t, requestHash, "Request HashSHA256 header: notempty")
+
+		h := hmac.New(sha256.New, []byte("secret"))
+		h.Write(body)
+		wantedHash := hex.EncodeToString(h.Sum(nil))
+		assert.Equal(t, wantedHash, requestHash, "Request HashSHA256 header: check")
 	}
 }
 
@@ -49,7 +60,7 @@ func TestReport(t *testing.T) {
 
 	storage := storage.New()
 	initStorage(storage)
-	client := New(storage, server.URL)
+	client := New(storage, server.URL, "secret")
 	client.Report()
 }
 

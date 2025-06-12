@@ -12,17 +12,19 @@ type Config struct {
 	BaseURL        string
 	PollInterval   uint64
 	ReportInterval uint64
+	SecretKey      string
 }
 
 func MustLoadConfig() *Config {
 	var (
-		schema = "http"
-		addr   string
-		pi, ri uint64
-		err    error
+		schema    = "http"
+		addr, key string
+		pi, ri    uint64
+		err       error
 	)
 
-	flag.StringVar(&addr, "a", "localhost:8080", "address to serve")
+	flag.StringVar(&addr, "a", "localhost:8080", "server address")
+	flag.StringVar(&key, "k", "", "secret key")
 	flag.Uint64Var(&pi, "p", 2, "poll interval in seconds")
 	flag.Uint64Var(&ri, "r", 10, "report interval in seconds")
 
@@ -30,6 +32,10 @@ func MustLoadConfig() *Config {
 
 	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
 		addr = envAddr
+	}
+
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		key = envKey
 	}
 
 	if envPI := os.Getenv("POLL_INTERVAL"); envPI != "" {
@@ -50,5 +56,6 @@ func MustLoadConfig() *Config {
 		BaseURL:        schema + "://" + addr,
 		PollInterval:   pi,
 		ReportInterval: ri,
+		SecretKey:      key,
 	}
 }
