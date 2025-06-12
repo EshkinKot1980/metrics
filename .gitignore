@@ -20,8 +20,8 @@ metricstest
 statictest
 
 # App data
-storage/server/*
-!storage/server/.gitkeep
+data/server/*
+!data/server/.gitkeep
 
 # Dependency directories (remove the comment below to include it)
 vendor/

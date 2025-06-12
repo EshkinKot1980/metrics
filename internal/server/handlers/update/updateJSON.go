@@ -3,13 +3,10 @@ package update
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
-
-type Logger interface {
-	Error(message string, err error)
-}
 
 type UpdateJSONHandler struct {
 	updater Updater
@@ -33,14 +30,30 @@ func (h *UpdateJSONHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var (
+		delta int64
+		err   error
+	)
 	switch metric.MType {
 	case models.TypeGauge:
-		h.updater.PutGauge(metric.ID, *metric.Value)
+		err = h.updater.PutGauge(metric.ID, *metric.Value)
 		metric.Delta = nil
 	case models.TypeCounter:
-		delta := h.updater.PutCounter(metric.ID, *metric.Delta)
+		delta, err = h.updater.PutCounter(metric.ID, *metric.Delta)
 		metric.Delta = &delta
 		metric.Value = nil
+	}
+
+	if err != nil {
+		valueToLong := "value too long for type character varying(32)"
+		if strings.Contains(err.Error(), valueToLong) {
+			http.Error(w, "id is too long, maximum 32 characters", http.StatusBadRequest)
+			return
+		}
+
+		h.logger.Error("failed to save metric", err)
+		http.Error(w, "failed to save metric", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
