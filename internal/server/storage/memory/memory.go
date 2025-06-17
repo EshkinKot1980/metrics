@@ -29,6 +29,8 @@ func (s *MemoryStorage) PutCounter(name string, increment int64) (int64, error) 
 }
 
 func (s *MemoryStorage) PutGauge(name string, value float64) error {
+	s.cmx.Lock()
+	defer s.cmx.Unlock()
 	s.gauges[name] = value
 	return nil
 }
@@ -68,6 +70,9 @@ func (s *MemoryStorage) GetCounter(name string) (int64, error) {
 }
 
 func (s *MemoryStorage) GetGauge(name string) (float64, error) {
+	s.cmx.RLock()
+	defer s.cmx.RUnlock()
+
 	v, ok := s.gauges[name]
 	if !ok {
 		return v, storage.ErrGaugeNotFound

@@ -14,12 +14,20 @@ func main() {
 	s := storage.New()
 	c := client.New(s, cfg.BaseURL, cfg.SecretKey)
 	m := monitor.New(s)
+	am := monitor.NewAdditionalMonitor(s)
+	pollInterval := time.Duration(cfg.PollInterval) * time.Second
 
 	go func() {
-		interval := time.Duration(cfg.PollInterval) * time.Second
 		for {
-			<-time.After(interval)
+			<-time.After(pollInterval)
 			m.Poll()
+		}
+	}()
+
+	go func() {
+		for {
+			<-time.After(pollInterval)
+			am.Poll()
 		}
 	}()
 

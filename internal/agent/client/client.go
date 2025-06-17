@@ -81,24 +81,24 @@ func (c *HTTPClient) Report() {
 		return
 	}
 
-	if !c.sendMetric(metrics) {
+	if !c.sendMetrics(metrics) {
 		c.storage.Put(counters, []agent.Gauge{})
 	}
 }
 
-func (c *HTTPClient) sendMetric(metric []models.Metrics) bool {
+func (c *HTTPClient) sendMetrics(metrics []models.Metrics) bool {
 	retries := []int{1, 3, 5}
 	i := 0
 	for {
 		succes, retry := true, false
-		req := c.client.R().SetBody(metric)
+		req := c.client.R().SetBody(metrics)
 		resp, err := req.Post(Path)
 
 		if err != nil {
 			log.Print(err)
 			succes, retry = false, true
 		} else if !resp.IsSuccess() {
-			log.Print("Code: ", resp.StatusCode(), " Body: ", resp)
+			log.Print("POST", c.address, Path, " Code: ", resp.StatusCode(), " Body: ", resp)
 			succes = false
 
 			if resp.StatusCode() == 500 {
