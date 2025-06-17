@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
 type Updater interface {
-	PutCounter(name string, increment int64) int64
-	PutGauge(name string, value float64)
+	PutCounter(name string, increment int64) (int64, error)
+	PutGauge(name string, value float64) error
+}
+
+type Logger interface {
+	Error(message string, err error)
 }
 
 type UpdateHandler struct {
@@ -18,11 +23,12 @@ type UpdateHandler struct {
 	logger  Logger
 }
 
-func New(u Updater) *UpdateHandler {
-	return &UpdateHandler{updater: u}
+func New(u Updater, l Logger) *UpdateHandler {
+	return &UpdateHandler{updater: u, logger: l}
 }
 
 func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
+	var err error
 	metric, err := makeMetricFromPath(r)
 
 	if err != nil {
@@ -32,9 +38,21 @@ func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	switch metric.MType {
 	case models.TypeGauge:
-		h.updater.PutGauge(metric.ID, *metric.Value)
+		err = h.updater.PutGauge(metric.ID, *metric.Value)
 	case models.TypeCounter:
-		h.updater.PutCounter(metric.ID, *metric.Delta)
+		_, err = h.updater.PutCounter(metric.ID, *metric.Delta)
+	}
+
+	if err != nil {
+		valueToLong := "value too long for type character varying(32)"
+		if strings.Contains(err.Error(), valueToLong) {
+			http.Error(w, "id is too long, maximum 32 characters", http.StatusBadRequest)
+			return
+		}
+
+		h.logger.Error("failed to save metric", err)
+		http.Error(w, "failed to save metric", http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -93,7 +93,7 @@ func TestUpdateJSONHandler(t *testing.T) {
 			reqBody: `{"id":"TestGauge","type":"unknown","delta":1,"value":3.14}`,
 			want: want{
 				code: http.StatusBadRequest,
-				body: "invalid metric type: unknown",
+				body: "invalid metric type",
 			},
 		},
 	}

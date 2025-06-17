@@ -56,7 +56,7 @@ func TestMetrics_Validate(t *testing.T) {
 				Delta: &delta,
 				Value: &value,
 			},
-			err: errors.New("invalid metric type: unknown"),
+			err: errors.New("invalid metric type"),
 		},
 	}
 

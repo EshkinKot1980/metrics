@@ -118,7 +118,8 @@ func TestUpdateHandler(t *testing.T) {
 	}
 
 	updater := memory.New()
-	handler := New(updater)
+	logger := LoggerStub{}
+	handler := New(updater, logger)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

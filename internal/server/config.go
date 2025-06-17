@@ -15,20 +15,22 @@ type FileStorageConfig struct {
 
 // TODO: добавть настройки http-сервера
 type Config struct {
-	ServerAddr string
-	StorageCfg FileStorageConfig
+	DatabaseDSN string
+	ServerAddr  string
+	FileCfg     FileStorageConfig
 }
 
 func MustLoadConfig() *Config {
 	var (
-		a, f string
-		i    uint64
-		r    bool
-		err  error
+		a, d, f string
+		i       uint64
+		r       bool
+		err     error
 	)
 
 	flag.StringVar(&a, "a", "localhost:8080", "address to serve")
-	flag.StringVar(&f, "f", "storage/server/metrics.json", "file storage path")
+	flag.StringVar(&d, "d", "", "database dsn")
+	flag.StringVar(&f, "f", "data/server/metrics.json", "file storage path")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
 
@@ -36,6 +38,10 @@ func MustLoadConfig() *Config {
 
 	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
 		a = envAddr
+	}
+
+	if envDSN := os.Getenv("DATABASE_DSN"); envDSN != "" {
+		d = envDSN
 	}
 
 	if envPath := os.Getenv("FILE_STORAGE_PATH"); envPath != "" {
@@ -57,8 +63,9 @@ func MustLoadConfig() *Config {
 	}
 
 	return &Config{
-		ServerAddr: a,
-		StorageCfg: FileStorageConfig{
+		DatabaseDSN: d,
+		ServerAddr:  a,
+		FileCfg: FileStorageConfig{
 			Interval: i,
 			Path:     f,
 			Restore:  r,

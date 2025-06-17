@@ -1,11 +1,11 @@
 package retrieve
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
+	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
 
 type Retriever interface {
@@ -26,16 +26,16 @@ func New(r Retriever, l Logger) *ValueHandler {
 	return &ValueHandler{retriever: r, logger: l}
 }
 
-func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
+func (h *ValueHandler) Retrieve(w http.ResponseWriter, r *http.Request) {
 	var (
-		name    = req.PathValue("name")
+		name    = r.PathValue("name")
 		gauge   float64
 		counter int64
 		err     error
 		body    string
 	)
 
-	switch t := req.PathValue("type"); t {
+	switch t := r.PathValue("type"); t {
 	case models.TypeGauge:
 		gauge, err = h.retriever.GetGauge(name)
 		body = fmt.Sprintf("%v", gauge)
@@ -43,17 +43,23 @@ func (h *ValueHandler) Retrieve(res http.ResponseWriter, req *http.Request) {
 		counter, err = h.retriever.GetCounter(name)
 		body = fmt.Sprintf("%v", counter)
 	default:
-		err = errors.New("invalid metric type: " + t)
+		err = models.ErrInvalidMetricType
 	}
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusNotFound)
+		switch err {
+		case storage.ErrCounterNotFound, storage.ErrGaugeNotFound, models.ErrInvalidMetricType:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			h.logger.Error("failed to retrieve metric", err)
+			http.Error(w, "failed to retrieve metric", http.StatusInternalServerError)
+		}
 		return
 	}
 
-	_, err = res.Write([]byte(body))
+	_, err = w.Write([]byte(body))
 	if err != nil {
 		h.logger.Error("unexpected error", err)
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

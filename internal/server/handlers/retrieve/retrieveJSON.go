@@ -2,10 +2,10 @@ package retrieve
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
+	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
 
 type ValueJSONHandler struct {
@@ -40,11 +40,17 @@ func (h *ValueJSONHandler) Retrieve(w http.ResponseWriter, r *http.Request) {
 		metric.Delta = &delta
 		metric.Value = nil
 	default:
-		err = errors.New("invalid metric type: " + metric.MType)
+		err = models.ErrInvalidMetricType
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		switch err {
+		case storage.ErrCounterNotFound, storage.ErrGaugeNotFound, models.ErrInvalidMetricType:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			h.logger.Error("failed to retrieve metric", err)
+			http.Error(w, "failed to retrieve metric", http.StatusInternalServerError)
+		}
 		return
 	}
 
