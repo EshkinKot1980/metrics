@@ -51,16 +51,16 @@ func (h *HashHeader) Validate(next http.Handler) http.Handler {
 }
 
 func (h *HashHeader) Sign(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		writer := w
-		if h.secret != "" {
-			writer = newSignWriter(w, h.secret)
-		}
-
-		next.ServeHTTP(writer, r)
+	if h.secret == "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+		})
 	}
 
-	return http.HandlerFunc(fn)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writer := newSignWriter(w, h.secret)
+		next.ServeHTTP(writer, r)
+	})
 }
 
 type signWriter struct {

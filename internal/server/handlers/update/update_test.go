@@ -19,32 +19,24 @@ func TestUpdateHandler(t *testing.T) {
 		value string
 	}
 
-	type request struct {
-		path        string
-		values      pathValues
-		contentType string
-	}
-
 	type want struct {
 		code int
 		body string
 	}
 
 	tests := []struct {
-		name string
-		req  request
-		want want
+		name   string
+		path   string
+		values pathValues
+		want   want
 	}{
 		{
 			name: "positive_counter",
-			req: request{
-				path: "/update/counter/TestCounter/1",
-				values: pathValues{
-					mtype: "counter",
-					name:  "TestCounter",
-					value: "1",
-				},
-				contentType: "text/plain",
+			path: "/update/counter/TestCounter/1",
+			values: pathValues{
+				mtype: "counter",
+				name:  "TestCounter",
+				value: "1",
 			},
 			want: want{
 				code: http.StatusOK,
@@ -53,14 +45,11 @@ func TestUpdateHandler(t *testing.T) {
 		},
 		{
 			name: "negative_counter",
-			req: request{
-				path: "/update/counter/TestCounter/3.14",
-				values: pathValues{
-					mtype: "counter",
-					name:  "TestCounter",
-					value: "3.14",
-				},
-				contentType: "text/plain",
+			path: "/update/counter/TestCounter/3.14",
+			values: pathValues{
+				mtype: "counter",
+				name:  "TestCounter",
+				value: "3.14",
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -69,14 +58,11 @@ func TestUpdateHandler(t *testing.T) {
 		},
 		{
 			name: "positive_gauge",
-			req: request{
-				path: "/update/gauge/TestGauge/3.14",
-				values: pathValues{
-					mtype: "gauge",
-					name:  "TestGauge",
-					value: "3.14",
-				},
-				contentType: "text/plain",
+			path: "/update/gauge/TestGauge/3.14",
+			values: pathValues{
+				mtype: "gauge",
+				name:  "TestGauge",
+				value: "3.14",
 			},
 			want: want{
 				code: http.StatusOK,
@@ -85,14 +71,11 @@ func TestUpdateHandler(t *testing.T) {
 		},
 		{
 			name: "negative_gauge",
-			req: request{
-				path: "/update/gauge/TestGauge/wtf",
-				values: pathValues{
-					mtype: "gauge",
-					name:  "TestGauge",
-					value: "wtf",
-				},
-				contentType: "text/plain",
+			path: "/update/gauge/TestGauge/wtf",
+			values: pathValues{
+				mtype: "gauge",
+				name:  "TestGauge",
+				value: "wtf",
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -101,14 +84,11 @@ func TestUpdateHandler(t *testing.T) {
 		},
 		{
 			name: "negative_metric_type",
-			req: request{
-				path: "/update/unknown/TestUnknown/1",
-				values: pathValues{
-					mtype: "unknown",
-					name:  "TestUnknown",
-					value: "1",
-				},
-				contentType: "text/plain",
+			path: "/update/unknown/TestUnknown/1",
+			values: pathValues{
+				mtype: "unknown",
+				name:  "TestUnknown",
+				value: "1",
 			},
 			want: want{
 				code: http.StatusBadRequest,
@@ -123,11 +103,11 @@ func TestUpdateHandler(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodPost, test.req.path, nil)
-			r.Header.Set("content-type", test.req.contentType)
-			r.SetPathValue("type", test.req.values.mtype)
-			r.SetPathValue("name", test.req.values.name)
-			r.SetPathValue("value", test.req.values.value)
+			r := httptest.NewRequest(http.MethodPost, test.path, nil)
+			r.Header.Set("content-type", "text/plain")
+			r.SetPathValue("type", test.values.mtype)
+			r.SetPathValue("name", test.values.name)
+			r.SetPathValue("value", test.values.value)
 
 			w := httptest.NewRecorder()
 			handler.Update(w, r)

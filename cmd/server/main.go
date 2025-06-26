@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
@@ -29,7 +30,10 @@ func main() {
 	logger := server.MustSetupLogger()
 	defer logger.Sync()
 
-	storage, db := mustSetupStorage(config, logger)
+	storage, db, err := setupStorage(config, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer func() {
 		storage.Halt()
 		db.Close()
@@ -102,29 +106,29 @@ func setupRouter(config *server.Config, storage storage.Storage, logger *server.
 	return router
 }
 
-func mustSetupStorage(config *server.Config, logger *server.Logger) (storage.Storage, *sql.DB) {
+func setupStorage(config *server.Config, logger *server.Logger) (storage.Storage, *sql.DB, error) {
 	db, err := sql.Open("pgx", config.DatabaseDSN)
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	if config.DatabaseDSN != "" {
 		if err := db.Ping(); err != nil {
-			log.Fatal(err)
+			db.Close()
+			return nil, nil, fmt.Errorf("database is not reachable: %w", err)
 		}
-
 		storage, err := pg.New(db)
 		if err != nil {
-			log.Fatal(err)
+			db.Close()
+			return nil, nil, fmt.Errorf("failed to create storage: %w", err)
 		}
-
-		return storage, db
+		return storage, db, nil
 	}
 
 	storage, err := file.New(config.FileCfg, logger)
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	return storage, db
+	return storage, db, nil
 }

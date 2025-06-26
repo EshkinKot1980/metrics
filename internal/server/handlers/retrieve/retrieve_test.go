@@ -12,7 +12,7 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 )
 
-func TestNew(t *testing.T) {
+func TestValueHandler(t *testing.T) {
 	type pathValues struct {
 		mtype string
 		name  string

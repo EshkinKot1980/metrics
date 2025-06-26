@@ -87,10 +87,7 @@ func (c *HTTPClient) sendMetric() {
 
 		if err != nil {
 			log.Print(err)
-			return
-		}
-
-		if !resp.IsSuccess() {
+		} else if !resp.IsSuccess() {
 			log.Print("POST", c.address, Path, " Code: ", resp.StatusCode(), " Body: ", resp)
 		}
 	}

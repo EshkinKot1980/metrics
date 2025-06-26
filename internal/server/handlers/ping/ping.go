@@ -15,7 +15,7 @@ func New(db *sql.DB) *PingHandler {
 
 func (h *PingHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.Ping(); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+		http.Error(w, "", http.StatusServiceUnavailable)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

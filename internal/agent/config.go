@@ -12,6 +12,7 @@ var ErrNotNaturalNumber = errors.New("the value must be a natural number")
 
 type Config struct {
 	BaseURL        string
+	BatchReport    bool
 	PollInterval   uint64
 	ReportInterval uint64
 	RateLimit      uint64
@@ -20,8 +21,10 @@ type Config struct {
 
 func MustLoadConfig() *Config {
 	var (
-		schema    = "http"
-		addr, key string
+		schema      = "http"
+		addr, key   string
+		batchReport bool
+		err         error
 	)
 
 	pollInterval := new(natural)
@@ -36,6 +39,7 @@ func MustLoadConfig() *Config {
 	flag.Var(pollInterval, "p", "poll interval in seconds")
 	flag.Var(reportInterval, "r", "report interval in seconds")
 	flag.Var(rateLimit, "l", "rate limit, limit of simultaneous requests")
+	flag.BoolVar(&batchReport, "b", true, "batch report, send all metrics in one request")
 
 	flag.Parse()
 
@@ -48,21 +52,28 @@ func MustLoadConfig() *Config {
 	}
 
 	if envPI := os.Getenv("POLL_INTERVAL"); envPI != "" {
-		err := pollInterval.Set(envPI)
+		err = pollInterval.Set(envPI)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if envRI := os.Getenv("REPORT_INTERVALL"); envRI != "" {
-		err := reportInterval.Set(envRI)
+		err = reportInterval.Set(envRI)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if envRL := os.Getenv("RATE_LIMIT"); envRL != "" {
-		err := rateLimit.Set(envRL)
+		err = rateLimit.Set(envRL)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if envBR := os.Getenv("BATCH_REPORT"); envBR != "" {
+		batchReport, err = strconv.ParseBool(envBR)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -70,6 +81,7 @@ func MustLoadConfig() *Config {
 
 	return &Config{
 		BaseURL:        schema + "://" + addr,
+		BatchReport:    batchReport,
 		PollInterval:   pollInterval.value,
 		ReportInterval: reportInterval.value,
 		RateLimit:      rateLimit.value,

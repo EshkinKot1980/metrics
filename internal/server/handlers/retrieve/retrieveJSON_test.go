@@ -13,7 +13,7 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/storage/memory"
 )
 
-func TestValueJSONHandler(t *testing.T) {
+func TestJSONHandler(t *testing.T) {
 	type want struct {
 		code int
 		body string
@@ -75,7 +75,7 @@ func TestValueJSONHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reqBody := []byte(test.reqBody)
-			req := httptest.NewRequest(http.MethodGet, "/value", bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, "/value", bytes.NewBuffer(reqBody))
 
 			w := httptest.NewRecorder()
 			handler.Retrieve(w, req)
