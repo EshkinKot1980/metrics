@@ -10,16 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/EshkinKot1980/metrics/internal/server"
-	"github.com/EshkinKot1980/metrics/internal/server/handlers/info"
-	"github.com/EshkinKot1980/metrics/internal/server/handlers/ping"
-	"github.com/EshkinKot1980/metrics/internal/server/handlers/retrieve"
-	"github.com/EshkinKot1980/metrics/internal/server/handlers/update"
-	"github.com/EshkinKot1980/metrics/internal/server/handlers/updates"
-	"github.com/EshkinKot1980/metrics/internal/server/middleware"
+	"github.com/EshkinKot1980/metrics/internal/server/logger"
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/file"
 	"github.com/EshkinKot1980/metrics/internal/server/storage/pg"
@@ -27,31 +21,40 @@ import (
 
 func main() {
 	config := server.MustLoadConfig()
-	logger := server.MustSetupLogger()
+
+	logger, err := logger.New()
+	if err != nil {
+		log.Fatal("failed to init logger: ", err)
+	}
 	defer logger.Sync()
 
-	storage, db, err := setupStorage(config, logger)
+	db, err := sql.Open("pgx", config.DatabaseDSN)
 	if err != nil {
+		log.Fatal("failed to open database: ", err)
+	}
+	defer db.Close()
+
+	storage, err := makeStorage(config, db, logger)
+	if err != nil {
+		db.Close()
 		log.Fatal(err)
 	}
-	defer func() {
-		storage.Halt()
-		db.Close()
-	}()
+	defer storage.Halt()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	router := setupRouter(config, storage, logger, db)
-	runServer(ctx, config.ServerAddr, router)
+	router := server.NewRouter(config, storage, logger, db)
+	runServer(ctx, config.ServerAddr, router, db)
 }
 
-func runServer(ctx context.Context, addr string, router *chi.Mux) {
+func runServer(ctx context.Context, addr string, router http.Handler, db *sql.DB) {
 	srv := &http.Server{Addr: addr, Handler: router}
 
 	go func() {
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
+			db.Close()
 			log.Fatal(err)
 		}
 	}()
@@ -71,64 +74,22 @@ func runServer(ctx context.Context, addr string, router *chi.Mux) {
 	log.Println("server stopped")
 }
 
-func setupRouter(config *server.Config, storage storage.Storage, logger *server.Logger, db *sql.DB) *chi.Mux {
-	mwLogger := middleware.NewHTTPLogger(logger)
-	mwHashHeader := middleware.NewHashHeader(config.SecretKey)
-	updaterHandler := update.New(storage, logger)
-	updaterJSONHandler := update.NewJSONHandler(storage, logger)
-	updaterBatchHandler := updates.New(storage, logger)
-	retrieverHandler := retrieve.New(storage, logger)
-	retrieverJSONHandler := retrieve.NewJSONHandler(storage, logger)
-	pingHandler := ping.New(db)
-
-	router := chi.NewRouter()
-	router.Use(mwLogger.Log)
-	router.Use(middleware.GzipWrapper)
-	router.Use(mwHashHeader.Sign)
-
-	router.Route("/update", func(r chi.Router) {
-		r.Post("/{type}/{name}/{value}", updaterHandler.Update)
-		r.Post("/", updaterJSONHandler.Update)
-	})
-	router.Route("/updates", func(r chi.Router) {
-		r.Use(mwHashHeader.Validate)
-		r.Post("/", updaterBatchHandler.Update)
-	})
-	router.Route("/value", func(r chi.Router) {
-		r.Get("/{type}/{name}", retrieverHandler.Retrieve)
-		r.Post("/", retrieverJSONHandler.Retrieve)
-	})
-	router.Route("/ping", func(r chi.Router) {
-		r.Get("/", pingHandler.Ping)
-	})
-	router.Get("/", info.InfoPage)
-
-	return router
-}
-
-func setupStorage(config *server.Config, logger *server.Logger) (storage.Storage, *sql.DB, error) {
-	db, err := sql.Open("pgx", config.DatabaseDSN)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
+func makeStorage(config *server.Config, db *sql.DB, logger *logger.Logger) (storage.Storage, error) {
 	if config.DatabaseDSN != "" {
 		if err := db.Ping(); err != nil {
-			db.Close()
-			return nil, nil, fmt.Errorf("database is not reachable: %w", err)
+			return nil, fmt.Errorf("database is not reachable: %w", err)
 		}
 		storage, err := pg.New(db)
 		if err != nil {
-			db.Close()
-			return nil, nil, fmt.Errorf("failed to create storage: %w", err)
+			return nil, fmt.Errorf("failed to create storage: %w", err)
 		}
-		return storage, db, nil
+		return storage, nil
 	}
 
 	storage, err := file.New(config.FileCfg, logger)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create storage: %w", err)
+		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
-	return storage, db, nil
+	return storage, nil
 }

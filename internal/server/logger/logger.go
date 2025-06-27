@@ -1,7 +1,6 @@
-package server
+package logger
 
 import (
-	"log"
 	"time"
 
 	"go.uber.org/zap"
@@ -24,13 +23,13 @@ type ResponseLogData struct {
 }
 
 // В дальнейшем здесь будет конфигурация зависящая от окружения (environment)
-func MustSetupLogger() *Logger {
+func New() (*Logger, error) {
 	l, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return &Logger{logger: l}
+	return &Logger{logger: l}, nil
 }
 
 func (l *Logger) Sync() {

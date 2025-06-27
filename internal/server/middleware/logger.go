@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/server/logger"
 )
 
 type HTTPLogger struct {
 	logger HTTPLogWriter
 }
 
-type requestData = server.RequestLogData
-type responseData = server.ResponseLogData
+type requestData = logger.RequestLogData
+type responseData = logger.ResponseLogData
 
 type HTTPLogWriter interface {
 	RequestInfo(message string, req *requestData, resp *responseData)
