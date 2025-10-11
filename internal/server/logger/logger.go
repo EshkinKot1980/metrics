@@ -24,7 +24,7 @@ type ResponseLogData struct {
 
 // В дальнейшем здесь будет конфигурация зависящая от окружения (environment)
 func New() (*Logger, error) {
-	l, err := zap.NewDevelopment()
+	l, err := zap.NewDevelopment(zap.AddCallerSkip(1))
 	if err != nil {
 		return nil, err
 	}

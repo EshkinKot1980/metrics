@@ -1,4 +1,4 @@
-package server
+package config
 
 import (
 	"flag"
@@ -21,7 +21,7 @@ type Config struct {
 	FileCfg     FileStorageConfig
 }
 
-func MustLoadConfig() *Config {
+func MustLoad() *Config {
 	var (
 		a, d, f, k string
 		i          uint64

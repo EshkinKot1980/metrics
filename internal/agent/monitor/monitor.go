@@ -25,7 +25,7 @@ func New(u Updater) *Monitor {
 
 func (m *Monitor) Poll() {
 	m.counters = []agent.Counter{
-		agent.Counter{Name: "PollCount", Value: 1},
+		{Name: "PollCount", Value: 1},
 	}
 
 	m.gauges = make([]agent.Gauge, 0, len(agent.MemStatsFields)+1)

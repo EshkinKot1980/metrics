@@ -76,7 +76,10 @@ func newSignWriter(w http.ResponseWriter, secret string) *signWriter {
 func (s *signWriter) Write(p []byte) (int, error) {
 	hash := hashHexString(p, s.secret)
 	s.w.Header().Set("HashSHA256", hash)
-	s.w.WriteHeader(s.code)
+	if s.code != 0 {
+		s.w.WriteHeader(s.code)
+	}
+
 	return s.w.Write(p)
 }
 

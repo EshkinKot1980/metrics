@@ -44,6 +44,10 @@ func (h *HTTPLogger) Log(next http.Handler) http.Handler {
 			Duration: time.Since(start),
 		}
 
+		if responseData.Status == 0 {
+			responseData.Status = http.StatusOK
+		}
+
 		h.logger.RequestInfo("server api", requestData, responseData)
 	}
 

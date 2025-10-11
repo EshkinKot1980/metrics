@@ -1,20 +1,23 @@
-package ping
+package handler
 
 import (
-	"database/sql"
 	"net/http"
 )
 
-type PingHandler struct {
-	db *sql.DB
+type DBPinger interface {
+	Ping() bool
 }
 
-func New(db *sql.DB) *PingHandler {
-	return &PingHandler{db: db}
+type PingHandler struct {
+	pinger DBPinger
+}
+
+func NewPingHandler(p DBPinger) *PingHandler {
+	return &PingHandler{pinger: p}
 }
 
 func (h *PingHandler) Ping(w http.ResponseWriter, r *http.Request) {
-	if err := h.db.Ping(); err != nil {
+	if !h.pinger.Ping() {
 		http.Error(w, "", http.StatusServiceUnavailable)
 		return
 	}
