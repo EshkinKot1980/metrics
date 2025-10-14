@@ -1,30 +1,45 @@
 package agent
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"os"
 	"strconv"
 )
 
-// TODO: добавть настройки http-клиента
+var ErrNotNaturalNumber = errors.New("the value must be a natural number")
+
 type Config struct {
 	BaseURL        string
+	BatchReport    bool
 	PollInterval   uint64
 	ReportInterval uint64
+	RateLimit      uint64
+	SecretKey      string
 }
 
 func MustLoadConfig() *Config {
 	var (
-		schema = "http"
-		addr   string
-		pi, ri uint64
-		err    error
+		schema      = "http"
+		addr, key   string
+		batchReport bool
+		err         error
 	)
 
-	flag.StringVar(&addr, "a", "localhost:8080", "address to serve")
-	flag.Uint64Var(&pi, "p", 2, "poll interval in seconds")
-	flag.Uint64Var(&ri, "r", 10, "report interval in seconds")
+	pollInterval := new(natural)
+	pollInterval.value = 2
+	reportInterval := new(natural)
+	reportInterval.value = 10
+	rateLimit := new(natural)
+	rateLimit.value = 10
+
+	flag.StringVar(&addr, "a", "localhost:8080", "server address")
+	flag.StringVar(&key, "k", "", "secret key")
+	flag.Var(pollInterval, "p", "poll interval in seconds")
+	flag.Var(reportInterval, "r", "report interval in seconds")
+	flag.Var(rateLimit, "l", "rate limit, limit of simultaneous requests")
+	flag.BoolVar(&batchReport, "b", true, "batch report, send all metrics in one request")
 
 	flag.Parse()
 
@@ -32,15 +47,33 @@ func MustLoadConfig() *Config {
 		addr = envAddr
 	}
 
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		key = envKey
+	}
+
 	if envPI := os.Getenv("POLL_INTERVAL"); envPI != "" {
-		pi, err = strconv.ParseUint(envPI, 10, 64)
+		err = pollInterval.Set(envPI)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if envRI := os.Getenv("REPORT_INTERVALL"); envRI != "" {
-		pi, err = strconv.ParseUint(envRI, 10, 64)
+		err = reportInterval.Set(envRI)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if envRL := os.Getenv("RATE_LIMIT"); envRL != "" {
+		err = rateLimit.Set(envRL)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if envBR := os.Getenv("BATCH_REPORT"); envBR != "" {
+		batchReport, err = strconv.ParseBool(envBR)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -48,7 +81,30 @@ func MustLoadConfig() *Config {
 
 	return &Config{
 		BaseURL:        schema + "://" + addr,
-		PollInterval:   pi,
-		ReportInterval: ri,
+		BatchReport:    batchReport,
+		PollInterval:   pollInterval.value,
+		ReportInterval: reportInterval.value,
+		RateLimit:      rateLimit.value,
+		SecretKey:      key,
 	}
+}
+
+type natural struct {
+	value uint64
+}
+
+func (n *natural) String() string {
+	return strconv.FormatUint(n.value, 10)
+}
+
+func (n *natural) Set(flagValue string) error {
+	v, err := strconv.ParseUint(flagValue, 10, 64)
+	if err != nil {
+		return ErrNotNaturalNumber
+	}
+	if v == 0 {
+		return ErrNotNaturalNumber
+	}
+	n.value = v
+	return nil
 }

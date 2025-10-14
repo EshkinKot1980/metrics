@@ -1,16 +1,15 @@
-package client
+package compatible
 
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,13 +19,13 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
+var testCounterChan = make(chan int)
+
 func testRequest(r *http.Request) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
-		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
 		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
-		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip", "Request Accept-Encoding header")
-		assert.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
+		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
 
 		gz, err := gzip.NewReader(r.Body)
 		require.Nil(t, err, "Request Body decompressing: creating reader)")
@@ -35,23 +34,37 @@ func testRequest(r *http.Request) func(t *testing.T) {
 		body, err := io.ReadAll(gz)
 		require.Nil(t, err, "Request Body decompressing: reading body")
 
-		var metrics []models.Metrics
+		var metric models.Metrics
 		bodyReader := bytes.NewReader(body)
-		err = json.NewDecoder(bodyReader).Decode(&metrics)
+		err = json.NewDecoder(bodyReader).Decode(&metric)
 		require.Nil(t, err, "Request Body decoding")
 
-		for _, m := range metrics {
-			assert.Nil(t, m.Validate(), "Metric "+m.ID+" data validation")
+		err = metric.Validate()
+		assert.Nil(t, err, "Metric data validation")
+
+		testCounterChan <- 1
+	}
+}
+
+func testQueryCount(ctx context.Context, t *testing.T) {
+	count := 0
+done:
+	for {
+		select {
+		case <-ctx.Done():
+			break done
+		case <-testCounterChan:
+			count++
 		}
 
-		requestHash := r.Header.Get("HashSHA256")
-		assert.NotEmpty(t, requestHash, "Request HashSHA256 header: notempty")
-
-		h := hmac.New(sha256.New, []byte("secret"))
-		h.Write(body)
-		wantedHash := hex.EncodeToString(h.Sum(nil))
-		assert.Equal(t, wantedHash, requestHash, "Request HashSHA256 header: check")
+		if count >= 4 {
+			break done
+		}
 	}
+
+	t.Run("query_count_test", func(t *testing.T) {
+		assert.Equal(t, 4, count, "Requests count")
+	})
 }
 
 func TestReport(t *testing.T) {
@@ -60,8 +73,13 @@ func TestReport(t *testing.T) {
 
 	storage := storage.New()
 	initStorage(storage)
-	client := New(storage, server.URL, "secret")
+	client := New(storage, server.URL, 2)
 	client.Report()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second/10)
+	defer cancel()
+
+	testQueryCount(ctx, t)
 }
 
 func makeHadler(t *testing.T) http.Handler {
@@ -76,12 +94,12 @@ func makeHadler(t *testing.T) http.Handler {
 func initStorage(s *storage.MemoryStorage) {
 	s.Put(
 		[]agent.Counter{
-			{Name: "TestCounter", Value: 13},
-			{Name: "Visitors", Value: 256},
+			agent.Counter{Name: "TestCounter", Value: 13},
+			agent.Counter{Name: "Visitors", Value: 256},
 		},
 		[]agent.Gauge{
-			{Name: "ConstE", Value: 2.71828},
-			{Name: "TTL", Value: 3.14e50},
+			agent.Gauge{Name: "ConstE", Value: 2.71828},
+			agent.Gauge{Name: "TTL", Value: 3.14e50},
 		},
 	)
 }

@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/server/logger"
 )
 
 type HTTPLogger struct {
 	logger HTTPLogWriter
 }
 
-type requestData = server.RequestLogData
-type responseData = server.ResponseLogData
+type requestData = logger.RequestLogData
+type responseData = logger.ResponseLogData
 
 type HTTPLogWriter interface {
 	RequestInfo(message string, req *requestData, resp *responseData)
@@ -42,6 +42,10 @@ func (h *HTTPLogger) Log(next http.Handler) http.Handler {
 			URI:      r.RequestURI,
 			Method:   r.Method,
 			Duration: time.Since(start),
+		}
+
+		if responseData.Status == 0 {
+			responseData.Status = http.StatusOK
 		}
 
 		h.logger.RequestInfo("server api", requestData, responseData)

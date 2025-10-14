@@ -3,6 +3,9 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"sync"
@@ -27,22 +30,26 @@ type Storage interface {
 type HTTPClient struct {
 	storage Storage
 	address string
+	secret  string
 	client  *resty.Client
 	mx      sync.Mutex
 }
 
-func New(s Storage, serverAddr string) *HTTPClient {
-	return &HTTPClient{
+func New(s Storage, serverAddr string, secret string) *HTTPClient {
+	c := HTTPClient{
 		storage: s,
 		address: serverAddr,
+		secret:  secret,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
-			SetHeader("Content-Type", ContentType).
 			SetHeader("Accept-Encoding", "gzip").
-			SetHeader("Content-Encoding", "gzip").
-			OnBeforeRequest(gzipWrapper),
+			SetHeader("Content-Type", ContentType),
 	}
+
+	c.client.OnBeforeRequest(c.requestWrapper)
+
+	return &c
 }
 
 func (c *HTTPClient) Report() {
@@ -74,24 +81,24 @@ func (c *HTTPClient) Report() {
 		return
 	}
 
-	if !c.sendMetric(metrics) {
+	if !c.sendMetrics(metrics) {
 		c.storage.Put(counters, []agent.Gauge{})
 	}
 }
 
-func (c *HTTPClient) sendMetric(metric []models.Metrics) bool {
+func (c *HTTPClient) sendMetrics(metrics []models.Metrics) bool {
 	retries := []int{1, 3, 5}
 	i := 0
 	for {
 		succes, retry := true, false
-		req := c.client.R().SetBody(metric)
+		req := c.client.R().SetBody(metrics)
 		resp, err := req.Post(Path)
 
 		if err != nil {
 			log.Print(err)
 			succes, retry = false, true
 		} else if !resp.IsSuccess() {
-			log.Print("Code: ", resp.StatusCode(), " Body: ", resp)
+			log.Print("POST", c.address, Path, " Code: ", resp.StatusCode(), " Body: ", resp)
 			succes = false
 
 			if resp.StatusCode() == 500 {
@@ -110,7 +117,7 @@ func (c *HTTPClient) sendMetric(metric []models.Metrics) bool {
 
 }
 
-func gzipWrapper(c *resty.Client, r *resty.Request) error {
+func (c *HTTPClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	var body bytes.Buffer
 
 	bodyJSON, err := json.Marshal(r.Body)
@@ -126,6 +133,14 @@ func gzipWrapper(c *resty.Client, r *resty.Request) error {
 		return err
 	}
 
+	if c.secret != "" {
+		h := hmac.New(sha256.New, []byte(c.secret))
+		h.Write(bodyJSON)
+		hash := h.Sum(nil)
+		r.SetHeader("HashSHA256", hex.EncodeToString(hash))
+	}
+
+	r.SetHeader("Content-Encoding", "gzip")
 	r.SetBody(&body)
 	return nil
 }
