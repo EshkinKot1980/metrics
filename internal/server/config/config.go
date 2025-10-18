@@ -18,6 +18,8 @@ type Config struct {
 	DatabaseDSN string
 	ServerAddr  string
 	SecretKey   string
+	AuditFile   string
+	AuditURL    string
 	FileCfg     FileStorageConfig
 }
 
@@ -26,6 +28,8 @@ func MustLoad() *Config {
 		a, d, f, k string
 		i          uint64
 		r          bool
+		auditFile  string
+		auditURL   string
 		err        error
 	)
 
@@ -35,6 +39,8 @@ func MustLoad() *Config {
 	flag.StringVar(&k, "k", "", "secret key")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
+	flag.StringVar(&auditFile, "audit-file", "", "audit file path")
+	flag.StringVar(&auditURL, "audit-url", "", "audit url")
 
 	flag.Parse()
 
@@ -68,10 +74,24 @@ func MustLoad() *Config {
 		}
 	}
 
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		k = envKey
+	}
+
+	if envAuditFile := os.Getenv("AUDIT_FILE"); envAuditFile != "" {
+		auditFile = envAuditFile
+	}
+
+	if envAuditURL := os.Getenv("AUDIT_FILE"); envAuditURL != "" {
+		auditURL = envAuditURL
+	}
+
 	return &Config{
 		DatabaseDSN: d,
 		ServerAddr:  a,
 		SecretKey:   k,
+		AuditFile:   auditFile,
+		AuditURL:    auditURL,
 		FileCfg: FileStorageConfig{
 			Interval: i,
 			Path:     f,

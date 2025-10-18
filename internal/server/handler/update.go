@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/EshkinKot1980/metrics/internal/common/models"
+	"github.com/EshkinKot1980/metrics/internal/server/service"
 )
 
 type UpdateService interface {
@@ -86,7 +88,9 @@ func (h *UpdateHandler) UpdateList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err := h.service.PutList(r.Context(), metrics)
+	addr := strings.Split(r.RemoteAddr, ":")
+	ctx := context.WithValue(r.Context(), service.KeyClientIP, addr[0])
+	err := h.service.PutList(ctx, metrics)
 	if err != nil {
 		msg := http.StatusText(http.StatusInternalServerError)
 		http.Error(w, msg, http.StatusInternalServerError)

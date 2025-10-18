@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/go-chi/chi/v5"
+	chiMW "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/EshkinKot1980/metrics/internal/server/config"
 	"github.com/EshkinKot1980/metrics/internal/server/handler"
@@ -31,6 +32,7 @@ func NewRouter(
 	pinger := handler.NewPingHandler(p)
 
 	router := chi.NewRouter()
+	router.Use(chiMW.RealIP)
 	router.Use(mwLogger.Log)
 	router.Use(middleware.GzipWrapper)
 	router.Use(mwHashHeader.Sign)
