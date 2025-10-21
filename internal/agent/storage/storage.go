@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"github.com/EshkinKot1980/metrics/internal/agent"
 	"sync"
+
+	"github.com/EshkinKot1980/metrics/internal/agent"
 )
 
 type MemoryStorage struct {
