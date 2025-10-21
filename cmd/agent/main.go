@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
@@ -16,6 +18,11 @@ type reporter interface {
 
 func main() {
 	cfg := agent.MustLoadConfig()
+
+	if cfg.PprofAdrr != "" {
+		go http.ListenAndServe(cfg.PprofAdrr, nil)
+	}
+
 	s := storage.New()
 	m := monitor.New(s)
 	am := monitor.NewAdditionalMonitor(s)

@@ -37,6 +37,9 @@ func NewRouter(
 	router.Use(middleware.GzipWrapper)
 	router.Use(mwHashHeader.Sign)
 
+	// В прродакшине тут будет ограничение по IP
+	router.Mount("/debug", chiMW.Profiler())
+
 	router.Route("/update", func(r chi.Router) {
 		r.Post("/{type}/{name}/{value}", updater.UpdateFromPath)
 		r.Post("/", updater.Update)

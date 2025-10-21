@@ -100,8 +100,8 @@ func (s *MetricService) Put(metric models.Metrics) (models.Metrics, error) {
 
 func (s *MetricService) PutList(ctx context.Context, metrics []models.Metrics) error {
 	counters := []storage.Counter{}
-	gauges := []storage.Gauge{}
-	metricNames := []string{}
+	gauges := make([]storage.Gauge, 0, len(metrics))
+	metricNames := make([]string, 0, len(metrics))
 
 	for _, metric := range metrics {
 		switch metric.MType {

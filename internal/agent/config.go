@@ -17,12 +17,14 @@ type Config struct {
 	ReportInterval uint64
 	RateLimit      uint64
 	SecretKey      string
+	PprofAdrr      string
 }
 
 func MustLoadConfig() *Config {
 	var (
 		schema      = "http"
 		addr, key   string
+		pprofAdrr   string
 		batchReport bool
 		err         error
 	)
@@ -34,12 +36,16 @@ func MustLoadConfig() *Config {
 	rateLimit := new(natural)
 	rateLimit.value = 10
 
+	pprofUsage := "profiler address:port, if specify :8080," +
+		" profiler will be available at http://localhost:8080/debug/pprof/"
+
 	flag.StringVar(&addr, "a", "localhost:8080", "server address")
 	flag.StringVar(&key, "k", "", "secret key")
 	flag.Var(pollInterval, "p", "poll interval in seconds")
 	flag.Var(reportInterval, "r", "report interval in seconds")
 	flag.Var(rateLimit, "l", "rate limit, limit of simultaneous requests")
 	flag.BoolVar(&batchReport, "b", true, "batch report, send all metrics in one request")
+	flag.StringVar(&pprofAdrr, "pprof-addr", "", pprofUsage)
 
 	flag.Parse()
 
@@ -79,6 +85,10 @@ func MustLoadConfig() *Config {
 		}
 	}
 
+	if envPprofAdrr := os.Getenv("PPROF_ADDRESS"); envPprofAdrr != "" {
+		pprofAdrr = envPprofAdrr
+	}
+
 	return &Config{
 		BaseURL:        schema + "://" + addr,
 		BatchReport:    batchReport,
@@ -86,6 +96,7 @@ func MustLoadConfig() *Config {
 		ReportInterval: reportInterval.value,
 		RateLimit:      rateLimit.value,
 		SecretKey:      key,
+		PprofAdrr:      pprofAdrr,
 	}
 }
 
