@@ -1,3 +1,4 @@
+// Модуль middleware реализует промежуточный слой обработки HTTP запроса.
 package middleware
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/logger"
 )
 
+// Реализует логирование запросов к HTTP серверу.
 type HTTPLogger struct {
 	logger HTTPLogWriter
 }
@@ -14,6 +16,7 @@ type HTTPLogger struct {
 type requestData = logger.RequestLogData
 type responseData = logger.ResponseLogData
 
+// Непосредственно логирует данные запросов.
 type HTTPLogWriter interface {
 	RequestInfo(message string, req *requestData, resp *responseData)
 }
@@ -22,6 +25,7 @@ func NewHTTPLogger(l HTTPLogWriter) *HTTPLogger {
 	return &HTTPLogger{logger: l}
 }
 
+// Логирует HTTP запрос.
 func (h *HTTPLogger) Log(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

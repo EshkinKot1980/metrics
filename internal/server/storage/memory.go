@@ -1,3 +1,4 @@
+// Модуль storage реализует хранение данных на сервере.
 package storage
 
 import (
@@ -5,6 +6,7 @@ import (
 	"sync"
 )
 
+// Хранилище метрик в пямяти, реализует интерфейс Storage, используется в тестах.
 type MemoryStorage struct {
 	cmx      sync.RWMutex
 	counters map[string]int64

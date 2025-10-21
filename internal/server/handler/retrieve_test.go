@@ -226,4 +226,4 @@ func (l LoggerStub) Error(message string, err error) {}
 
 type AuditorStub struct{}
 
-func (a AuditorStub) Rise(e audit.Event)
+func (a AuditorStub) Rise(e audit.Event) {}

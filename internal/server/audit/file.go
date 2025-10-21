@@ -1,3 +1,4 @@
+// Модуль аудита полученных метрик.
 package audit
 
 import (
@@ -8,6 +9,7 @@ import (
 	"sync"
 )
 
+// Сохраняет логи аудитав файл, реализует интерфейс Subscrber.
 type FileAuditor struct {
 	path  string
 	loger Logger

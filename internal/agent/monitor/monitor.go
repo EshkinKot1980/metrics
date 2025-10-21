@@ -1,3 +1,4 @@
+// Модуль сбора метрик.
 package monitor
 
 import (
@@ -8,12 +9,16 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/agent"
 )
 
+// Количество метрик MemStats из пакета runtime.
 const MemStatsFieldsCount = 27
 
+// Хранилище для собраных метрик.
 type Updater interface {
 	Put(c []agent.Counter, g []agent.Gauge)
 }
 
+// Собирает метрики (тип датчик) состояния памяти из пакета runtime,
+// также счетчик "PollCount" и датчик "RandomValue".
 type Monitor struct {
 	updater  Updater
 	gauges   []agent.Gauge
@@ -24,6 +29,7 @@ func New(u Updater) *Monitor {
 	return &Monitor{updater: u}
 }
 
+// Сбор метрик.
 func (m *Monitor) Poll() {
 	m.counters = []agent.Counter{
 		{Name: "PollCount", Value: 1},

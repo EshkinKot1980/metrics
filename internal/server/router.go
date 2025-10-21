@@ -1,3 +1,4 @@
+// Модуль server реализует серверную часть приложения сбора метрик.
 package server
 
 import (
@@ -9,16 +10,19 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
 )
 
+// Cервис для работы с метриками, объединяет сервисы из пакета handler.
 type MetricService interface {
 	handler.RetrieveService
 	handler.UpdateService
 }
 
+// Логгер, объединяет логгер из пакета handler с логгером из пакета middleware.
 type Loger interface {
 	handler.Logger
 	middleware.HTTPLogWriter
 }
 
+// Инициализация роутера.
 func NewRouter(
 	cfg *config.Config,
 	srv MetricService,

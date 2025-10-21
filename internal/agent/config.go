@@ -1,3 +1,4 @@
+// Модуль agent реализует клиентскую часть приложения сбора метрик.
 package agent
 
 import (
@@ -10,16 +11,19 @@ import (
 
 var ErrNotNaturalNumber = errors.New("the value must be a natural number")
 
+// Конфигурация агента.
 type Config struct {
-	BaseURL        string
-	BatchReport    bool
-	PollInterval   uint64
-	ReportInterval uint64
-	RateLimit      uint64
-	SecretKey      string
-	PprofAdrr      string
+	BaseURL        string // корневой путь API сервера
+	BatchReport    bool   // указывает ну жли ли отправлять все метрики одним запросом
+	PollInterval   uint64 // интервал сбора мертик в секундах
+	ReportInterval uint64 // интервал отправки данных на сервер в секундах
+	RateLimit      uint64 // количество одновременных запросов к серверу
+	SecretKey      string // ключ для подписи запросов
+	PprofAdrr      string // адрес профилировщика в формате "host:port"
 }
 
+// Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
+// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
 func MustLoadConfig() *Config {
 	var (
 		schema      = "http"

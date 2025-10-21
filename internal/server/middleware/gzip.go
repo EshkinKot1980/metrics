@@ -1,3 +1,4 @@
+// Модуль middleware реализует промежуточный слой обработки HTTP запроса.
 package middleware
 
 import (
@@ -7,6 +8,7 @@ import (
 	"strings"
 )
 
+// Реализует распаковку запроса и сжатие ответа.
 func GzipWrapper(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		writer := w

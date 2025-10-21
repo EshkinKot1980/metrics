@@ -1,3 +1,4 @@
+// Модуль handler реализует обработчики http запросов.
 package handler
 
 import (
@@ -10,11 +11,15 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/service"
 )
 
+// Сервис сохранения метрик.
 type UpdateService interface {
+	// Сохраняет метрику, возвращает её обновленное состояние.
 	Put(metric models.Metrics) (models.Metrics, error)
+	// Сохраняет множество метрик.
 	PutList(ctx context.Context, metrics []models.Metrics) error
 }
 
+// Обработчик для сохранения метрик.
 type UpdateHandler struct {
 	service UpdateService
 	logger  Logger
@@ -24,6 +29,7 @@ func NewUpdateHandler(s UpdateService, l Logger) *UpdateHandler {
 	return &UpdateHandler{service: s, logger: l}
 }
 
+// Обновляет метрику из параметров пути GET запроса.
 func (h *UpdateHandler) UpdateFromPath(w http.ResponseWriter, r *http.Request) {
 	metric, err := models.MakeMetrics(
 		r.PathValue("name"),
@@ -46,6 +52,8 @@ func (h *UpdateHandler) UpdateFromPath(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Обновляет метрику из тела POST запроса в формате JSON.
+// В случае успеха возвращает её обновленное значение.
 func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var metric models.Metrics
 
@@ -73,6 +81,7 @@ func (h *UpdateHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Обновляет множество метрик из тела POST запроса в формате JSON.
 func (h *UpdateHandler) UpdateList(w http.ResponseWriter, r *http.Request) {
 	var metrics []models.Metrics
 

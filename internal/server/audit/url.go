@@ -1,3 +1,4 @@
+// Модуль аудита полученных метрик.
 package audit
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
+// Отправляет данные аудита на URL методом POST, реализует интерфейс Subscrber.
 type URLauditor struct {
 	url    string
 	logger Logger

@@ -1,3 +1,4 @@
+// Модуль конфигурации сервера.
 package config
 
 import (
@@ -7,22 +8,34 @@ import (
 	"strconv"
 )
 
+// Конгигурация файлового хранилища.
 type FileStorageConfig struct {
+	// Интервал сохранения данных в секундах
 	Interval uint64
-	Path     string
-	Restore  bool
+	// Путь файла сохранения данных, по умолчанию "data/server/metrics.json"
+	Path string
+	// Определяет нужно ли загружать данные из файла при запуске приложения.
+	Restore bool
 }
 
-// TODO: добавть настройки http-сервера
+// Конфигурация сервера.
 type Config struct {
+	// DSN для подключения к СУБД Postgres.
 	DatabaseDSN string
-	ServerAddr  string
-	SecretKey   string
-	AuditFile   string
-	AuditURL    string
-	FileCfg     FileStorageConfig
+	// Адрес для работы веб вервера в формате "host:port".
+	ServerAddr string
+	// Ключ для проверки подписи запросов и подписи ответов,
+	// если не указан то проверка и подпись не производятся.
+	SecretKey string
+	// Файл для сохранения событий аудита.
+	AuditFile string
+	// URL для отправки событий аудита.
+	AuditURL string
+	FileCfg  FileStorageConfig
 }
 
+// Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
+// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
 func MustLoad() *Config {
 	var (
 		a, d, f, k string

@@ -1,3 +1,4 @@
+// Модуль storage реализует хранение данных на сервере.
 package storage
 
 import (
@@ -35,6 +36,7 @@ const (
 	selectGaugeQuery   = `SELECT value FROM gauges WHERE id = $1`
 )
 
+// Хранилище метрик на основе СУБД Postgres, реализует интерфейс Storage.
 type DBStorage struct {
 	db *sql.DB
 }

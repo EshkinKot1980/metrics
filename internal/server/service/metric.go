@@ -1,3 +1,4 @@
+// Модуль service реализует сервисный слой для сервера сбора метрик.
 package service
 
 import (
@@ -10,12 +11,16 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
 
+// Ключ для хранения данных в контексте
 type ContextKey string
 
+// IPv4 адрес клиента.
 const KeyClientIP ContextKey = "clientIP"
 
+// Метрика отсутсвует в хранилище.
 var ErrMetricNotFound = errors.New("metric not found")
 
+// Хранилище метрик.
 type Storage interface {
 	GetCounter(c storage.Counter) (storage.Counter, error)
 	GetGauge(g storage.Gauge) (storage.Gauge, error)
@@ -24,14 +29,18 @@ type Storage interface {
 	PutMetrics(ctx context.Context, counters []storage.Counter, gauges []storage.Gauge) error
 }
 
+// Loogger, логирует ошибки.
 type Logger interface {
 	Error(message string, err error)
 }
 
+// Auditor осуществляет аудит сохраненных метрик.
 type Auditor interface {
+	// Создает событие аудита.
 	Rise(e audit.Event)
 }
 
+// Сервис для работы с метриками.
 type MetricService struct {
 	storage Storage
 	logger  Logger
@@ -42,6 +51,9 @@ func NewMetricService(s Storage, l Logger, a Auditor) *MetricService {
 	return &MetricService{storage: s, logger: l, auditor: a}
 }
 
+// Заполняет метрику из хранилища. Получает метрику заполнеными полями ID и MType,
+// возвращает её с заполнеными полями Value или Delta в зависимости от типа.
+// В качестве ошибки может вернуть ErrMetricNotFound.
 func (s *MetricService) Fill(metric models.Metrics) (models.Metrics, error) {
 	var (
 		counter storage.Counter
@@ -74,6 +86,7 @@ func (s *MetricService) Fill(metric models.Metrics) (models.Metrics, error) {
 	return metric, err
 }
 
+// Сохраняет метрику в хранилище, возвращает её обновленное состояние.
 func (s *MetricService) Put(metric models.Metrics) (models.Metrics, error) {
 	var err error
 
@@ -98,6 +111,7 @@ func (s *MetricService) Put(metric models.Metrics) (models.Metrics, error) {
 	return metric, err
 }
 
+// Сохраняет множество метрик в хранилище.
 func (s *MetricService) PutList(ctx context.Context, metrics []models.Metrics) error {
 	counters := []storage.Counter{}
 	gauges := make([]storage.Gauge, 0, len(metrics))

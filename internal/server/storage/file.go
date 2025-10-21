@@ -1,3 +1,4 @@
+// Модуль storage реализует хранение данных на сервере.
 package storage
 
 import (
@@ -11,12 +12,10 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/config"
 )
 
+// Конфигурация файлового хранилища.
 type FSconfig = config.FileStorageConfig
 
-type Logger interface {
-	Error(message string, err error)
-}
-
+// Хранилище метрик в файловой системе, реализует интерфейс Storage.
 type FileStorage struct {
 	MemoryStorage
 	config FSconfig

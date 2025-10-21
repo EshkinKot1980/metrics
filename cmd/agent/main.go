@@ -7,7 +7,7 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/client"
-	oldClient "github.com/EshkinKot1980/metrics/internal/agent/client/compatible"
+	oldAPIclient "github.com/EshkinKot1980/metrics/internal/agent/client/compatible"
 	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
 )
@@ -31,7 +31,7 @@ func main() {
 	if cfg.BatchReport {
 		r = client.New(s, cfg.BaseURL, cfg.SecretKey)
 	} else {
-		r = oldClient.New(s, cfg.BaseURL, cfg.RateLimit)
+		r = oldAPIclient.New(s, cfg.BaseURL, cfg.RateLimit)
 	}
 
 	pollInterval := time.Duration(cfg.PollInterval) * time.Second

@@ -1,4 +1,6 @@
-// Достал из гита клиент, отсылающий запросы на /update, чтобы было куда воткнуть Worker Pool
+// Модуль отправки метрик на сервер совместимый с предыдущей версией API.
+// Достал из гита клиент, отсылающий метрики по одной на ендпоинт /update,
+// чтобы было куда воткнуть Worker Pool
 package compatible
 
 import (
@@ -20,10 +22,14 @@ const (
 	estimatedMetricsCount = 256
 )
 
+// Хранилище метрик
 type Retriever interface {
+	// Забирает метрики из хранилища.
 	Pull() ([]agent.Counter, []agent.Gauge)
 }
 
+// Клиент отправляющий метрики на сервер по одной в формате JSON.
+// Поддерживает отправку метрик внесколько потоков.
 type HTTPClient struct {
 	retriever Retriever
 	address   string
@@ -59,6 +65,7 @@ func (c *HTTPClient) makeWorkers(count uint64) {
 	}
 }
 
+// Оправляет метрики на сервер.
 func (c *HTTPClient) Report() {
 	var metric models.Metrics
 	counters, gauges := c.retriever.Pull()
