@@ -1,3 +1,4 @@
+// Модуль сбора метрик.
 package monitor
 
 import (
@@ -10,8 +11,11 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/agent"
 )
 
+// Оценочное количество ядер процессоров.
 const estimatedCPUcount = 128
 
+// Собирает дополнительные метрики типа датчик при помощи gopsutil:
+// "TotalMemory", "FreeMemory", "CPUutilizationN" (N - номер процессора)
 type AdditionalMonitor struct {
 	updater Updater
 	gauges  []agent.Gauge
@@ -21,6 +25,7 @@ func NewAdditionalMonitor(u Updater) *AdditionalMonitor {
 	return &AdditionalMonitor{updater: u}
 }
 
+// Сбор метрик.
 func (m *AdditionalMonitor) Poll() {
 	m.gauges = make([]agent.Gauge, 0, estimatedCPUcount+2)
 	m.collectMemUsage()

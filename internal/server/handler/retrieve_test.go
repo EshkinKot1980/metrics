@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/EshkinKot1980/metrics/internal/server/audit"
 	"github.com/EshkinKot1980/metrics/internal/server/service"
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
@@ -111,7 +112,8 @@ func TestRetrieveHandler_GetByPath(t *testing.T) {
 	s.PutCounter(storage.Counter{Name: "TestCounter", Value: 13})
 	s.PutGauge(storage.Gauge{Name: "TestGauge", Value: 3.14})
 	logger := LoggerStub{}
-	srv := service.NewMetricService(s, logger)
+	auditor := AuditorStub{}
+	srv := service.NewMetricService(s, logger, auditor)
 	handler := NewRetrieveHandler(srv, logger)
 
 	for _, test := range tests {
@@ -193,7 +195,8 @@ func TestRetrieveHandler_GetJSON(t *testing.T) {
 	s.PutCounter(storage.Counter{Name: "TestCounter", Value: 13})
 	s.PutGauge(storage.Gauge{Name: "TestGauge", Value: 3.14})
 	logger := LoggerStub{}
-	srv := service.NewMetricService(s, logger)
+	auditor := AuditorStub{}
+	srv := service.NewMetricService(s, logger, auditor)
 	handler := NewRetrieveHandler(srv, logger)
 
 	for _, test := range tests {
@@ -220,3 +223,7 @@ func TestRetrieveHandler_GetJSON(t *testing.T) {
 type LoggerStub struct{}
 
 func (l LoggerStub) Error(message string, err error) {}
+
+type AuditorStub struct{}
+
+func (a AuditorStub) Rise(e audit.Event) {}

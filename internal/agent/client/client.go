@@ -1,3 +1,4 @@
+// Модуль отправки метрик на сервер.
 package client
 
 import (
@@ -22,11 +23,16 @@ const (
 	ContentType = "application/json"
 )
 
+// Хранилище метрик.
 type Storage interface {
+	// Забирает метрики из хранилища.
 	Pull() ([]agent.Counter, []agent.Gauge)
+	// Помещает метрики в хранилище.
 	Put(c []agent.Counter, g []agent.Gauge)
 }
 
+// Клиент отправляющий метрики на сервер одним запросом в формате JSON.
+// Поддерживает сжатие gzip, подпись содержимого запроса, повторные попытки отправки запроса.
 type HTTPClient struct {
 	storage Storage
 	address string
@@ -52,6 +58,7 @@ func New(s Storage, serverAddr string, secret string) *HTTPClient {
 	return &c
 }
 
+// Оправляет метрики на сервер.
 func (c *HTTPClient) Report() {
 	if !c.mx.TryLock() {
 		return

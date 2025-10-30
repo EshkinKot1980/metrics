@@ -1,3 +1,4 @@
+// Модуль middleware реализует промежуточный слой обработки HTTP запроса.
 package middleware
 
 import (
@@ -9,6 +10,7 @@ import (
 	"net/http"
 )
 
+// Реализует проверку подписи запроса и подпись ответа.
 type HashHeader struct {
 	secret string
 }
@@ -17,6 +19,7 @@ func NewHashHeader(secretKey string) *HashHeader {
 	return &HashHeader{secret: secretKey}
 }
 
+// Проверяет подпись запроса и возвращает http.StatusBadRequest в случае неверной подписи.
 func (h *HashHeader) Validate(next http.Handler) http.Handler {
 	if h.secret == "" {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +53,7 @@ func (h *HashHeader) Validate(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+// Подписывает ответ сервера, помещая хэш ответа в заголовок HashSHA256
 func (h *HashHeader) Sign(next http.Handler) http.Handler {
 	if h.secret == "" {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

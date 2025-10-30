@@ -1,3 +1,4 @@
+// Модуль agent реализует клиентскую часть приложения сбора метрик.
 package agent
 
 import (
@@ -10,19 +11,24 @@ import (
 
 var ErrNotNaturalNumber = errors.New("the value must be a natural number")
 
+// Конфигурация агента.
 type Config struct {
-	BaseURL        string
-	BatchReport    bool
-	PollInterval   uint64
-	ReportInterval uint64
-	RateLimit      uint64
-	SecretKey      string
+	BaseURL        string // корневой путь API сервера
+	BatchReport    bool   // указывает ну жли ли отправлять все метрики одним запросом
+	PollInterval   uint64 // интервал сбора мертик в секундах
+	ReportInterval uint64 // интервал отправки данных на сервер в секундах
+	RateLimit      uint64 // количество одновременных запросов к серверу
+	SecretKey      string // ключ для подписи запросов
+	PprofAdrr      string // адрес профилировщика в формате "host:port"
 }
 
+// Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
+// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
 func MustLoadConfig() *Config {
 	var (
 		schema      = "http"
 		addr, key   string
+		pprofAdrr   string
 		batchReport bool
 		err         error
 	)
@@ -34,12 +40,16 @@ func MustLoadConfig() *Config {
 	rateLimit := new(natural)
 	rateLimit.value = 10
 
+	pprofUsage := "profiler address:port, if specify :8080," +
+		" profiler will be available at http://localhost:8080/debug/pprof/"
+
 	flag.StringVar(&addr, "a", "localhost:8080", "server address")
 	flag.StringVar(&key, "k", "", "secret key")
 	flag.Var(pollInterval, "p", "poll interval in seconds")
 	flag.Var(reportInterval, "r", "report interval in seconds")
 	flag.Var(rateLimit, "l", "rate limit, limit of simultaneous requests")
 	flag.BoolVar(&batchReport, "b", true, "batch report, send all metrics in one request")
+	flag.StringVar(&pprofAdrr, "pprof-addr", "", pprofUsage)
 
 	flag.Parse()
 
@@ -79,6 +89,10 @@ func MustLoadConfig() *Config {
 		}
 	}
 
+	if envPprofAdrr := os.Getenv("PPROF_ADDRESS"); envPprofAdrr != "" {
+		pprofAdrr = envPprofAdrr
+	}
+
 	return &Config{
 		BaseURL:        schema + "://" + addr,
 		BatchReport:    batchReport,
@@ -86,6 +100,7 @@ func MustLoadConfig() *Config {
 		ReportInterval: reportInterval.value,
 		RateLimit:      rateLimit.value,
 		SecretKey:      key,
+		PprofAdrr:      pprofAdrr,
 	}
 }
 

@@ -1,3 +1,4 @@
+// Модуль handler реализует обработчики http запросов.
 package handler
 
 import (
@@ -10,14 +11,20 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/service"
 )
 
+// Сервис получения метрик.
 type RetrieveService interface {
+	// Заполняет метрику. Получает метрику заполнеными полями ID и MType,
+	// возвращает её с заполнеными полями Value или Delta в зависимости от типа.
+	// В качестве ошибки может вернуть ErrMetricNotFound.
 	Fill(metric models.Metrics) (models.Metrics, error)
 }
 
+// Loogger, логирует ошибки.
 type Logger interface {
 	Error(message string, err error)
 }
 
+// Обработчик для получения метрик.
 type RetrieveHandler struct {
 	service RetrieveService
 	logger  Logger
@@ -27,6 +34,7 @@ func NewRetrieveHandler(s RetrieveService, l Logger) *RetrieveHandler {
 	return &RetrieveHandler{service: s, logger: l}
 }
 
+// Отдает метрику, получая её название и тип из параметров пути GET запроса.
 func (h *RetrieveHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 	metric := models.Metrics{
 		ID:    r.PathValue("name"),
@@ -66,6 +74,8 @@ func (h *RetrieveHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Отдает метрику в формате JSON,
+// получает из тела POST запроса метрику в формате JSON с заполнеными полями полями ID и MType.
 func (h *RetrieveHandler) GetJSON(w http.ResponseWriter, r *http.Request) {
 	var metric models.Metrics
 

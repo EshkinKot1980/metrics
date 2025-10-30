@@ -94,12 +94,12 @@ func makeHadler(t *testing.T) http.Handler {
 func initStorage(s *storage.MemoryStorage) {
 	s.Put(
 		[]agent.Counter{
-			agent.Counter{Name: "TestCounter", Value: 13},
-			agent.Counter{Name: "Visitors", Value: 256},
+			{Name: "TestCounter", Value: 13},
+			{Name: "Visitors", Value: 256},
 		},
 		[]agent.Gauge{
-			agent.Gauge{Name: "ConstE", Value: 2.71828},
-			agent.Gauge{Name: "TTL", Value: 3.14e50},
+			{Name: "ConstE", Value: 2.71828},
+			{Name: "TTL", Value: 3.14e50},
 		},
 	)
 }

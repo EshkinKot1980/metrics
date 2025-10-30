@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/EshkinKot1980/metrics/internal/server"
+	"github.com/EshkinKot1980/metrics/internal/server/audit"
 	"github.com/EshkinKot1980/metrics/internal/server/config"
 	"github.com/EshkinKot1980/metrics/internal/server/logger"
 	"github.com/EshkinKot1980/metrics/internal/server/service"
@@ -36,7 +38,10 @@ func run(cfg *config.Config) error {
 	}
 	defer storage.Halt()
 
-	service := service.NewMetricService(storage, logger)
+	auditor := audit.NewAuditor(cfg, logger)
+	defer auditor.Halt()
+
+	service := service.NewMetricService(storage, logger, auditor)
 	router := server.NewRouter(cfg, service, storage, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

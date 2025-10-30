@@ -1,10 +1,14 @@
+// Модуль для временного хранения метрик.
 package storage
 
 import (
-	"github.com/EshkinKot1980/metrics/internal/agent"
 	"sync"
+
+	"github.com/EshkinKot1980/metrics/internal/agent"
 )
 
+// Хранилище метрик в памяти. Накапливает значение счетчиков
+// в период между отправками на сервер, хранит последнее значение датчиков.
 type MemoryStorage struct {
 	mx       sync.Mutex
 	counters map[string]int64

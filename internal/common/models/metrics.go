@@ -1,3 +1,4 @@
+// Модели данных для обмена между агентом и сервером.
 package models
 
 import (
@@ -7,9 +8,9 @@ import (
 )
 
 const (
-	TypeGauge   = "gauge"
-	TypeCounter = "counter"
-	IDmaxLen    = 32
+	TypeGauge   = "gauge"   // тип метрики датчик
+	TypeCounter = "counter" // тип метрики датчик
+	IDmaxLen    = 32        // максимальная длина названия метики
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 	ErrIDisTooLong       = errors.New("id is too long, maximum 32 characters")
 )
 
+// Модель метрики.
 type Metrics struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
@@ -26,6 +28,8 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 }
 
+// Создание метрики из строковых значений.
+// Используется при создани метрики из пути GET запроса.
 func MakeMetrics(id, mType, value string) (Metrics, error) {
 	metric := Metrics{
 		ID:    id,
@@ -56,7 +60,7 @@ func MakeMetrics(id, mType, value string) (Metrics, error) {
 	return metric, nil
 }
 
-// Проверяет входящие на сервер данные
+// Проверяет входящие на сервер данные.
 func (m Metrics) Validate() error {
 	switch m.MType {
 	case TypeGauge:

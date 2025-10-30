@@ -100,7 +100,8 @@ func TestUpdateHandler_UpdateFromPath(t *testing.T) {
 
 	s := storage.NewMemoryStorage()
 	logger := LoggerStub{}
-	srv := service.NewMetricService(s, logger)
+	auditor := AuditorStub{}
+	srv := service.NewMetricService(s, logger, auditor)
 	handler := NewUpdateHandler(srv, logger)
 
 	for _, test := range tests {
@@ -224,7 +225,8 @@ func TestUpdateHandler_Update(t *testing.T) {
 
 	s := storage.NewMemoryStorage()
 	logger := LoggerStub{}
-	srv := service.NewMetricService(s, logger)
+	auditor := AuditorStub{}
+	srv := service.NewMetricService(s, logger, auditor)
 	handler := NewUpdateHandler(srv, logger)
 
 	for _, test := range tests {
@@ -331,7 +333,8 @@ func TestUpdateHandler_UpdateList(t *testing.T) {
 
 	s := storage.NewMemoryStorage()
 	logger := LoggerStub{}
-	srv := service.NewMetricService(s, logger)
+	auditor := AuditorStub{}
+	srv := service.NewMetricService(s, logger, auditor)
 	handler := NewUpdateHandler(srv, logger)
 
 	for _, test := range tests {

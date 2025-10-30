@@ -16,7 +16,22 @@ services:
       - 8080:8080
     networks:
       - metrics
-    command: go run cmd/server/main.go -a :8080 -i 30 -r -d postgres://metrics_usr:password@postgres-db:5432/metrics -k secret
+    command: go run cmd/server/main.go -a :8080 -r -d postgres://metrics_usr:password@postgres-db:5432/metrics -k secret --audit-file data/server/audit.log
+
+  ## for profiling
+  # agent:
+  #   container_name: go-advaced-metrics-agent
+  #   build: 
+  #     context: ./docker/go
+  #   depends_on:
+  #     - server
+  #   volumes:
+  #     - .:/go/app
+  #   ports:
+  #     - 9090:9090
+  #   networks:
+  #     - metrics
+  #   command: go run cmd/agent/main.go -a server:8080 -k secret -p 1 -r 2 -pprof-addr :9090
 
   postgres-db:
       container_name: go-advaced-metrics-postgres-db

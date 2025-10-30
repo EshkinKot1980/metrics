@@ -1,3 +1,4 @@
+// Модуль конфигурации сервера.
 package config
 
 import (
@@ -7,25 +8,41 @@ import (
 	"strconv"
 )
 
+// Конгигурация файлового хранилища.
 type FileStorageConfig struct {
+	// Интервал сохранения данных в секундах
 	Interval uint64
-	Path     string
-	Restore  bool
+	// Путь файла сохранения данных, по умолчанию "data/server/metrics.json"
+	Path string
+	// Определяет нужно ли загружать данные из файла при запуске приложения.
+	Restore bool
 }
 
-// TODO: добавть настройки http-сервера
+// Конфигурация сервера.
 type Config struct {
+	// DSN для подключения к СУБД Postgres.
 	DatabaseDSN string
-	ServerAddr  string
-	SecretKey   string
-	FileCfg     FileStorageConfig
+	// Адрес для работы веб вервера в формате "host:port".
+	ServerAddr string
+	// Ключ для проверки подписи запросов и подписи ответов,
+	// если не указан то проверка и подпись не производятся.
+	SecretKey string
+	// Файл для сохранения событий аудита.
+	AuditFile string
+	// URL для отправки событий аудита.
+	AuditURL string
+	FileCfg  FileStorageConfig
 }
 
+// Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
+// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
 func MustLoad() *Config {
 	var (
 		a, d, f, k string
 		i          uint64
 		r          bool
+		auditFile  string
+		auditURL   string
 		err        error
 	)
 
@@ -35,6 +52,8 @@ func MustLoad() *Config {
 	flag.StringVar(&k, "k", "", "secret key")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
+	flag.StringVar(&auditFile, "audit-file", "", "audit file path")
+	flag.StringVar(&auditURL, "audit-url", "", "audit url")
 
 	flag.Parse()
 
@@ -68,10 +87,24 @@ func MustLoad() *Config {
 		}
 	}
 
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		k = envKey
+	}
+
+	if envAuditFile := os.Getenv("AUDIT_FILE"); envAuditFile != "" {
+		auditFile = envAuditFile
+	}
+
+	if envAuditURL := os.Getenv("AUDIT_FILE"); envAuditURL != "" {
+		auditURL = envAuditURL
+	}
+
 	return &Config{
 		DatabaseDSN: d,
 		ServerAddr:  a,
 		SecretKey:   k,
+		AuditFile:   auditFile,
+		AuditURL:    auditURL,
 		FileCfg: FileStorageConfig{
 			Interval: i,
 			Path:     f,
