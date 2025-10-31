@@ -19,13 +19,17 @@ import (
 )
 
 func main() {
-	config := config.MustLoad()
-	if err := run(config); err != nil {
+	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(cfg *config.Config) error {
+func run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	logger, err := logger.New()
 	if err != nil {
 		return fmt.Errorf("failed to init logger: %w", err)

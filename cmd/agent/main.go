@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"time"
@@ -17,7 +18,10 @@ type reporter interface {
 }
 
 func main() {
-	cfg := agent.MustLoadConfig()
+	cfg, err := agent.LoadConfig()
+	if err != nil {
+		log.Fatal("failed to load config: ", err)
+	}
 
 	if cfg.PprofAdrr != "" {
 		go http.ListenAndServe(cfg.PprofAdrr, nil)

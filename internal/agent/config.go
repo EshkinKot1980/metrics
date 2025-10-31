@@ -4,7 +4,7 @@ package agent
 import (
 	"errors"
 	"flag"
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -23,8 +23,7 @@ type Config struct {
 }
 
 // Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
-// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
-func MustLoadConfig() *Config {
+func LoadConfig() (*Config, error) {
 	var (
 		schema      = "http"
 		addr, key   string
@@ -43,6 +42,8 @@ func MustLoadConfig() *Config {
 	pprofUsage := "profiler address:port, if specify :8080," +
 		" profiler will be available at http://localhost:8080/debug/pprof/"
 
+	flag.CommandLine = flag.NewFlagSet("", flag.ContinueOnError)
+
 	flag.StringVar(&addr, "a", "localhost:8080", "server address")
 	flag.StringVar(&key, "k", "", "secret key")
 	flag.Var(pollInterval, "p", "poll interval in seconds")
@@ -51,7 +52,10 @@ func MustLoadConfig() *Config {
 	flag.BoolVar(&batchReport, "b", true, "batch report, send all metrics in one request")
 	flag.StringVar(&pprofAdrr, "pprof-addr", "", pprofUsage)
 
-	flag.Parse()
+	err = flag.CommandLine.Parse(os.Args[1:])
+	if err != nil {
+		return &Config{}, fmt.Errorf("failed to parse flags %w", err)
+	}
 
 	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
 		addr = envAddr
@@ -64,28 +68,28 @@ func MustLoadConfig() *Config {
 	if envPI := os.Getenv("POLL_INTERVAL"); envPI != "" {
 		err = pollInterval.Set(envPI)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse POLL_INTERVAL %w", err)
 		}
 	}
 
 	if envRI := os.Getenv("REPORT_INTERVALL"); envRI != "" {
 		err = reportInterval.Set(envRI)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse REPORT_INTERVALL %w", err)
 		}
 	}
 
 	if envRL := os.Getenv("RATE_LIMIT"); envRL != "" {
 		err = rateLimit.Set(envRL)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse RATE_LIMIT %w", err)
 		}
 	}
 
 	if envBR := os.Getenv("BATCH_REPORT"); envBR != "" {
 		batchReport, err = strconv.ParseBool(envBR)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse BATCH_REPORT %w", err)
 		}
 	}
 
@@ -93,7 +97,7 @@ func MustLoadConfig() *Config {
 		pprofAdrr = envPprofAdrr
 	}
 
-	return &Config{
+	cfg := &Config{
 		BaseURL:        schema + "://" + addr,
 		BatchReport:    batchReport,
 		PollInterval:   pollInterval.value,
@@ -102,6 +106,8 @@ func MustLoadConfig() *Config {
 		SecretKey:      key,
 		PprofAdrr:      pprofAdrr,
 	}
+
+	return cfg, nil
 }
 
 type natural struct {
