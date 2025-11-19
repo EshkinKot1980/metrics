@@ -18,14 +18,28 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/server/storage"
 )
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
-	config := config.MustLoad()
-	if err := run(config); err != nil {
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
+
+	if err := run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(cfg *config.Config) error {
+func run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	logger, err := logger.New()
 	if err != nil {
 		return fmt.Errorf("failed to init logger: %w", err)

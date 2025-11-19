@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"time"
@@ -16,8 +18,21 @@ type reporter interface {
 	Report()
 }
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
-	cfg := agent.MustLoadConfig()
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
+
+	cfg, err := agent.LoadConfig()
+	if err != nil {
+		log.Fatal("failed to load config: ", err)
+	}
 
 	if cfg.PprofAdrr != "" {
 		go http.ListenAndServe(cfg.PprofAdrr, nil)

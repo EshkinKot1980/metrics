@@ -1,0 +1,278 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"go/ast"
+	"go/format"
+	"go/parser"
+	"go/token"
+	"html/template"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type fieldInfo struct {
+	Name          string
+	TypeName      string
+	IsPrimitive   bool
+	IsPointer     bool
+	IsPrimitivePt bool
+	IsSlice       bool
+	IsMap         bool
+	CheckForReset bool
+}
+
+type structInfo struct {
+	PkgName  string
+	TypeName string
+	Fields   []fieldInfo
+}
+
+func main() {
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		log.Fatal("failed to found project root dir: ", err)
+	}
+
+	pathsStructs, err := collectStructs(projectRoot)
+	if err != nil {
+		log.Fatal("failed to collect structs: ", err)
+	}
+
+	for path, structs := range pathsStructs {
+		err := generate(path, structs)
+		if err != nil {
+			err = fmt.Errorf("failed to generate file for %s: %w", path, err)
+			log.Println(err)
+		}
+	}
+}
+
+func findProjectRoot() (string, error) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	for {
+		goModPath := filepath.Join(currentDir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return currentDir, nil
+		}
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			return "", fmt.Errorf("go.mod not found in any parent directory")
+		}
+		currentDir = parentDir
+	}
+}
+
+func collectStructs(rootDir string) (map[string][]structInfo, error) {
+	fset := token.NewFileSet()
+	pkgStructs := make(map[string][]structInfo)
+
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("file access error %s: %w", path, err)
+		}
+
+		isGoFile := filepath.Ext(path) == ".go"
+		isTestFile := strings.HasSuffix(path, "_test.go")
+		isGenFile := strings.HasSuffix(path, ".gen.go")
+
+		if info.IsDir() || !isGoFile || isTestFile || isGenFile {
+			return nil
+		}
+
+		f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			return fmt.Errorf("failed to parse file %s : %w", path, err)
+		}
+
+		structs := parseFile(f)
+		if len(structs) > 0 {
+			dirPath := filepath.Dir(path)
+			pkgStructs[dirPath] = append(pkgStructs[dirPath], structs...)
+		}
+
+		return nil
+	})
+
+	return pkgStructs, err
+}
+
+func parseFile(f *ast.File) []structInfo {
+	var structs []structInfo
+
+	for _, d := range f.Decls {
+		genDecl, ok := d.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+
+		if genDecl.Doc == nil || !strings.Contains(genDecl.Doc.Text(), "generate:reset") {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			fields := parseStruct(structType)
+
+			structs = append(structs, structInfo{
+				PkgName:  f.Name.Name,
+				TypeName: typeSpec.Name.Name,
+				Fields:   fields,
+			})
+		}
+	}
+
+	return structs
+}
+
+func parseStruct(structType *ast.StructType) []fieldInfo {
+	var fields []fieldInfo
+
+	if structType.Fields == nil {
+		return fields
+	}
+
+	for _, field := range structType.Fields.List {
+		for _, name := range field.Names {
+			fi := fieldInfo{
+				Name: name.Name,
+			}
+
+			switch t := field.Type.(type) {
+			case *ast.Ident:
+				fi.TypeName = t.Name
+				if isPrimitive(t.Name) {
+					fi.IsPrimitive = true
+				} else {
+					fi.CheckForReset = true
+				}
+			case *ast.StarExpr:
+				fi.IsPointer = true
+				if baseType, ok := t.X.(*ast.Ident); ok {
+					fi.TypeName = baseType.Name
+					fi.IsPrimitivePt = isPrimitive(baseType.Name)
+				}
+			case *ast.ArrayType:
+				if t.Len == nil {
+					fi.IsSlice = true
+				}
+			case *ast.MapType:
+				fi.IsMap = true
+			case *ast.SelectorExpr:
+				fi.CheckForReset = true
+			}
+
+			fields = append(fields, fi)
+		}
+	}
+
+	return fields
+}
+
+func isPrimitive(typeName string) bool {
+	switch typeName {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"byte", "rune", "float32", "float64",
+		"string", "bool":
+		return true
+	}
+
+	return false
+}
+
+var funcTpl = `func (s *{{.TypeName}}) Reset() {
+	if s == nil {
+		return
+	}
+{{- range .Fields}}
+	{{- if .IsPrimitive}}
+	s.{{.Name}} = *new({{.TypeName}})
+	{{- else if .IsSlice}}
+	s.{{.Name}} = s.{{.Name}}[:0]
+	{{- else if .IsMap}}
+	clear(s.{{.Name}})
+	{{- else if .IsPointer}}
+	if s.{{.Name}} != nil {
+		{{- if .IsPrimitivePt}}
+		s.{{.Name}} = new({{.TypeName}})
+		{{- else}}
+		if reflect.TypeOf(s.{{.Name}}).Implements(reseterType) {
+			s.{{.Name}}.Reset()
+		}
+		{{- end}}
+	}
+	{{- else if .CheckForReset}}
+	if reflect.TypeOf(s.{{.Name}}).Implements(reseterType) {
+		s.{{.Name}}.Reset()
+	}
+	{{- end}}
+{{- end}}
+}
+
+`
+
+var tmpl = template.Must(template.New("reset").Parse(funcTpl))
+
+func generate(dir string, structs []structInfo) error {
+	if len(structs) == 0 {
+		return nil
+	}
+
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "// Code generated by reset generator; DO NOT EDIT.\n")
+	fmt.Fprintf(&buf, "// This file was generated by cmd/reset\n\n")
+	fmt.Fprintf(&buf, "package %s\n\n", structs[0].PkgName)
+	fmt.Fprintf(&buf, "import \"reflect\" \n\n")
+
+	reseter := `type reseter interface {
+		Reset()
+	}`
+	fmt.Fprintf(&buf, "%s\n\n", reseter)
+	fmt.Fprintf(&buf, "var reseterType = reflect.TypeOf((*reseter)(nil)).Elem()\n\n")
+
+	for _, s := range structs {
+		var methodBuf bytes.Buffer
+
+		err := tmpl.Execute(&methodBuf, s)
+		if err != nil {
+			return fmt.Errorf("failed to execute template for %s: %w", s.TypeName, err)
+		}
+
+		_, err = buf.Write(methodBuf.Bytes())
+		if err != nil {
+			return fmt.Errorf("failed to write methodBuf: %w", err)
+		}
+	}
+
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to format code for package %s: %w", dir, err)
+	}
+
+	output := filepath.Join(dir, "reset.gen.go")
+	err = os.WriteFile(output, formatted, 0664)
+	if err != nil {
+		return fmt.Errorf("failed to write file %s: %w", output, err)
+	}
+
+	return nil
+}

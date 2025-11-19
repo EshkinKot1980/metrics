@@ -3,7 +3,7 @@ package config
 
 import (
 	"flag"
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -35,8 +35,7 @@ type Config struct {
 }
 
 // Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
-// Может вызывать log.Fatal(), поэтому вызывается только в начале инициализации приложения.
-func MustLoad() *Config {
+func Load() (*Config, error) {
 	var (
 		a, d, f, k string
 		i          uint64
@@ -45,6 +44,8 @@ func MustLoad() *Config {
 		auditURL   string
 		err        error
 	)
+
+	flag.CommandLine = flag.NewFlagSet("", flag.ContinueOnError)
 
 	flag.StringVar(&a, "a", "localhost:8080", "address to serve")
 	flag.StringVar(&d, "d", "", "database dsn")
@@ -55,7 +56,10 @@ func MustLoad() *Config {
 	flag.StringVar(&auditFile, "audit-file", "", "audit file path")
 	flag.StringVar(&auditURL, "audit-url", "", "audit url")
 
-	flag.Parse()
+	err = flag.CommandLine.Parse(os.Args[1:])
+	if err != nil {
+		return &Config{}, fmt.Errorf("failed to parse flags %w", err)
+	}
 
 	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
 		a = envAddr
@@ -76,14 +80,14 @@ func MustLoad() *Config {
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
 		i, err = strconv.ParseUint(envInterval, 10, 64)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse STORE_INTERVAL %w", err)
 		}
 	}
 
 	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
 		r, err = strconv.ParseBool(envRestore)
 		if err != nil {
-			log.Fatal(err)
+			return &Config{}, fmt.Errorf("failed to parse RESTOREL %w", err)
 		}
 	}
 
@@ -99,7 +103,7 @@ func MustLoad() *Config {
 		auditURL = envAuditURL
 	}
 
-	return &Config{
+	cfg := &Config{
 		DatabaseDSN: d,
 		ServerAddr:  a,
 		SecretKey:   k,
@@ -111,4 +115,6 @@ func MustLoad() *Config {
 			Restore:  r,
 		},
 	}
+
+	return cfg, nil
 }
