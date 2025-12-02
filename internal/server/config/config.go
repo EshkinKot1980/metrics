@@ -27,6 +27,9 @@ type Config struct {
 	// Ключ для проверки подписи запросов и подписи ответов,
 	// если не указан то проверка и подпись не производятся.
 	SecretKey string
+	// Путь к приватному ключу для расшифровки запросов
+	// Если не указан расшифрока не производится
+	PrivateKey string
 	// Файл для сохранения событий аудита.
 	AuditFile string
 	// URL для отправки событий аудита.
@@ -42,6 +45,7 @@ func Load() (*Config, error) {
 		r          bool
 		auditFile  string
 		auditURL   string
+		cryptoKey  string
 		err        error
 	)
 
@@ -51,6 +55,7 @@ func Load() (*Config, error) {
 	flag.StringVar(&d, "d", "", "database dsn")
 	flag.StringVar(&f, "f", "data/server/metrics.json", "file storage path")
 	flag.StringVar(&k, "k", "", "secret key")
+	flag.StringVar(&cryptoKey, "crypto-key", "", "private key path")
 	flag.Uint64Var(&i, "i", 300, "store interval in seconds")
 	flag.BoolVar(&r, "r", false, "restore server state from file on start")
 	flag.StringVar(&auditFile, "audit-file", "", "audit file path")
@@ -75,6 +80,10 @@ func Load() (*Config, error) {
 
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		k = envKey
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		cryptoKey = envCryptoKey
 	}
 
 	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
@@ -107,6 +116,7 @@ func Load() (*Config, error) {
 		DatabaseDSN: d,
 		ServerAddr:  a,
 		SecretKey:   k,
+		PrivateKey:  cryptoKey,
 		AuditFile:   auditFile,
 		AuditURL:    auditURL,
 		FileCfg: FileStorageConfig{

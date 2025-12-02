@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -18,15 +19,19 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
 	"github.com/EshkinKot1980/metrics/internal/common/models"
+	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
-func testRequest(r *http.Request) func(t *testing.T) {
+func testRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
 		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
 		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
 		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip", "Request Accept-Encoding header")
 		assert.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
+		if priv != nil {
+			assert.Contains(t, r.Header.Get("X-Encrypted"), "true", "Request Content-Encoding header")
+		}
 
 		gz, err := gzip.NewReader(r.Body)
 		require.Nil(t, err, "Request Body decompressing: creating reader)")
@@ -34,6 +39,11 @@ func testRequest(r *http.Request) func(t *testing.T) {
 
 		body, err := io.ReadAll(gz)
 		require.Nil(t, err, "Request Body decompressing: reading body")
+
+		if priv != nil {
+			body, err = utils.DecryptWithPrivateKey(body, priv)
+			require.Nil(t, err, "Request Body decrypting")
+		}
 
 		var metrics []models.Metrics
 		bodyReader := bytes.NewReader(body)
@@ -55,19 +65,42 @@ func testRequest(r *http.Request) func(t *testing.T) {
 }
 
 func TestReport(t *testing.T) {
-	server := httptest.NewServer(makeHadler(t))
-	defer server.Close()
+	priv, pub, err := utils.GenerateKeyPair()
+	require.Nil(t, err, "Generate rsa key pair")
 
-	storage := storage.New()
-	initStorage(storage)
-	client := New(storage, server.URL, "secret")
-	client.Report()
+	tests := []struct {
+		name string
+		pub  *rsa.PublicKey
+		priv *rsa.PrivateKey
+	}{
+		{
+			name: "not_encrypted",
+		},
+		{
+			name: "encrypted",
+			pub:  pub,
+			priv: priv,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(makeHadler(t, test.priv))
+			defer server.Close()
+
+			storage := storage.New()
+			initStorage(storage)
+			client := New(storage, server.URL, "secret", test.pub)
+			client.Report()
+		})
+	}
+
 }
 
-func makeHadler(t *testing.T) http.Handler {
+func makeHadler(t *testing.T, priv *rsa.PrivateKey) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		name := "report_test"
-		t.Run(name, testRequest(r))
+		t.Run(name, testRequest(r, priv))
 	}
 
 	return http.HandlerFunc(fn)

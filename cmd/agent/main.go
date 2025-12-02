@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	oldAPIclient "github.com/EshkinKot1980/metrics/internal/agent/client/compatible"
 	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
+	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
 type reporter interface {
@@ -42,9 +44,17 @@ func main() {
 	m := monitor.New(s)
 	am := monitor.NewAdditionalMonitor(s)
 
+	var publicKey *rsa.PublicKey
+	if cfg.PublicKey != "" {
+		publicKey, err = utils.LoadPublicKey(cfg.PublicKey)
+		if err != nil {
+			log.Fatal("failed to load public key: ", err)
+		}
+	}
+
 	var r reporter
 	if cfg.BatchReport {
-		r = client.New(s, cfg.BaseURL, cfg.SecretKey)
+		r = client.New(s, cfg.BaseURL, cfg.SecretKey, publicKey)
 	} else {
 		r = oldAPIclient.New(s, cfg.BaseURL, cfg.RateLimit)
 	}

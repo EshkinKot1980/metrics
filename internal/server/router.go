@@ -2,9 +2,13 @@
 package server
 
 import (
+	"crypto/rsa"
+	"fmt"
+
 	"github.com/go-chi/chi/v5"
 	chiMW "github.com/go-chi/chi/v5/middleware"
 
+	"github.com/EshkinKot1980/metrics/internal/common/utils"
 	"github.com/EshkinKot1980/metrics/internal/server/config"
 	"github.com/EshkinKot1980/metrics/internal/server/handler"
 	"github.com/EshkinKot1980/metrics/internal/server/middleware"
@@ -28,9 +32,20 @@ func NewRouter(
 	srv MetricService,
 	p handler.DBPinger,
 	l Loger,
-) *chi.Mux {
+) (*chi.Mux, error) {
+	var privateKey *rsa.PrivateKey
+	var err error
+
+	if cfg.PrivateKey != "" {
+		privateKey, err = utils.LoadPrivateKey(cfg.PrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load private key: %w", err)
+		}
+	}
+
 	mwLogger := middleware.NewHTTPLogger(l)
 	mwHashHeader := middleware.NewHashHeader(cfg.SecretKey)
+	mwRSA := middleware.NewRSA(privateKey)
 	updater := handler.NewUpdateHandler(srv, l)
 	retriever := handler.NewRetrieveHandler(srv, l)
 	pinger := handler.NewPingHandler(p)
@@ -49,6 +64,7 @@ func NewRouter(
 		r.Post("/", updater.Update)
 	})
 	router.Route("/updates", func(r chi.Router) {
+		r.Use(mwRSA.Decrypt)
 		r.Use(mwHashHeader.Validate)
 		r.Post("/", updater.UpdateList)
 	})
@@ -61,5 +77,5 @@ func NewRouter(
 	})
 	router.Get("/", handler.InfoPage)
 
-	return router
+	return router, nil
 }

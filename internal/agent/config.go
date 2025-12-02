@@ -19,6 +19,7 @@ type Config struct {
 	ReportInterval uint64 // интервал отправки данных на сервер в секундах
 	RateLimit      uint64 // количество одновременных запросов к серверу
 	SecretKey      string // ключ для подписи запросов
+	PublicKey      string // ключ для шифрования запросов
 	PprofAdrr      string // адрес профилировщика в формате "host:port"
 }
 
@@ -28,6 +29,7 @@ func LoadConfig() (*Config, error) {
 		schema      = "http"
 		addr, key   string
 		pprofAdrr   string
+		cryptoKey   string
 		batchReport bool
 		err         error
 	)
@@ -46,6 +48,7 @@ func LoadConfig() (*Config, error) {
 
 	flag.StringVar(&addr, "a", "localhost:8080", "server address")
 	flag.StringVar(&key, "k", "", "secret key")
+	flag.StringVar(&cryptoKey, "crypto-key", "", "public key path")
 	flag.Var(pollInterval, "p", "poll interval in seconds")
 	flag.Var(reportInterval, "r", "report interval in seconds")
 	flag.Var(rateLimit, "l", "rate limit, limit of simultaneous requests")
@@ -63,6 +66,10 @@ func LoadConfig() (*Config, error) {
 
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		key = envKey
+	}
+
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		cryptoKey = envCryptoKey
 	}
 
 	if envPI := os.Getenv("POLL_INTERVAL"); envPI != "" {
@@ -104,6 +111,7 @@ func LoadConfig() (*Config, error) {
 		ReportInterval: reportInterval.value,
 		RateLimit:      rateLimit.value,
 		SecretKey:      key,
+		PublicKey:      cryptoKey,
 		PprofAdrr:      pprofAdrr,
 	}
 
