@@ -61,7 +61,7 @@ func run() error {
 		return fmt.Errorf("failed to init router: %w", err)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	return runServer(ctx, cfg.ServerAddr, router)

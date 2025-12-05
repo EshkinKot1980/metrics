@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"crypto/rsa"
 	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
@@ -60,22 +63,40 @@ func main() {
 		r = oldAPIclient.New(s, baseURL, cfg.RateLimit)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+
 	go func() {
 		for {
-			<-time.After(cfg.PollInterval)
-			m.Poll()
+			select {
+			case <-time.After(cfg.PollInterval):
+				m.Poll()
+			case <-ctx.Done():
+				return
+			}
+
 		}
 	}()
 
 	go func() {
 		for {
-			<-time.After(cfg.PollInterval)
-			am.Poll()
+			select {
+			case <-time.After(cfg.PollInterval):
+				am.Poll()
+			case <-ctx.Done():
+				return
+			}
+
 		}
 	}()
 
 	for {
-		<-time.After(cfg.ReportInterval)
-		r.Report()
+		select {
+		case <-time.After(cfg.ReportInterval):
+			r.Report()
+		case <-ctx.Done():
+			r.Report()
+			return
+		}
 	}
 }
