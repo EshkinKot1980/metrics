@@ -52,32 +52,30 @@ func main() {
 		}
 	}
 
+	baseURL := "http://" + cfg.APIAddres
 	var r reporter
 	if cfg.BatchReport {
-		r = client.New(s, cfg.BaseURL, cfg.SecretKey, publicKey)
+		r = client.New(s, baseURL, cfg.SecretKey, publicKey)
 	} else {
-		r = oldAPIclient.New(s, cfg.BaseURL, cfg.RateLimit)
+		r = oldAPIclient.New(s, baseURL, cfg.RateLimit)
 	}
-
-	pollInterval := time.Duration(cfg.PollInterval) * time.Second
 
 	go func() {
 		for {
-			<-time.After(pollInterval)
+			<-time.After(cfg.PollInterval)
 			m.Poll()
 		}
 	}()
 
 	go func() {
 		for {
-			<-time.After(pollInterval)
+			<-time.After(cfg.PollInterval)
 			am.Poll()
 		}
 	}()
 
-	interval := time.Duration(cfg.ReportInterval) * time.Second
 	for {
-		<-time.After(interval)
+		<-time.After(cfg.ReportInterval)
 		r.Report()
 	}
 }
