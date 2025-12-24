@@ -58,7 +58,10 @@ func main() {
 	baseURL := "http://" + cfg.APIAddres
 	var r reporter
 	if cfg.BatchReport {
-		r = client.New(s, baseURL, cfg.SecretKey, publicKey)
+		r, err = client.New(s, baseURL, cfg.SecretKey, publicKey)
+		if err != nil {
+			log.Fatal("failed to init reporter: ", err)
+		}
 	} else {
 		r = oldAPIclient.New(s, baseURL, cfg.RateLimit)
 	}

@@ -9,7 +9,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -44,7 +46,12 @@ type HTTPClient struct {
 	mx        sync.Mutex
 }
 
-func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) *HTTPClient {
+func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) (*HTTPClient, error) {
+	ip, err := defineIP()
+	if err != nil {
+		return nil, err
+	}
+
 	c := HTTPClient{
 		storage:   s,
 		address:   serverAddr,
@@ -53,13 +60,14 @@ func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) 
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
+			SetHeader("X-Real-IP", ip).
 			SetHeader("Accept-Encoding", "gzip").
 			SetHeader("Content-Type", ContentType),
 	}
 
 	c.client.OnBeforeRequest(c.requestWrapper)
 
-	return &c
+	return &c, nil
 }
 
 // Оправляет метрики на сервер.
@@ -164,4 +172,21 @@ func (c *HTTPClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	r.SetHeader("Content-Encoding", "gzip")
 	r.SetBody(&body)
 	return nil
+}
+
+func defineIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", fmt.Errorf("ошибка получения ip адресa: %w", err)
+
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("IP адрес не найден")
 }

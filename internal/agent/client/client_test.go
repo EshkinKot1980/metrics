@@ -33,6 +33,10 @@ func testRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
 			assert.Contains(t, r.Header.Get("X-Encrypted"), "true", "Request Content-Encoding header")
 		}
 
+		ip, err := defineIP()
+		require.Nil(t, err, "Define IP address")
+		assert.Equal(t, ip, r.Header.Get("X-Real-IP"), "Request X-Real-IP header")
+
 		gz, err := gzip.NewReader(r.Body)
 		require.Nil(t, err, "Request Body decompressing: creating reader)")
 		defer gz.Close()
@@ -90,7 +94,8 @@ func TestReport(t *testing.T) {
 
 			storage := storage.New()
 			initStorage(storage)
-			client := New(storage, server.URL, "secret", test.pub)
+			client, err := New(storage, server.URL, "secret", test.pub)
+			require.Nil(t, err, "Init client")
 			client.Report()
 		})
 	}

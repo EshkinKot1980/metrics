@@ -4,6 +4,7 @@ package server
 import (
 	"crypto/rsa"
 	"fmt"
+	"net"
 
 	"github.com/go-chi/chi/v5"
 	chiMW "github.com/go-chi/chi/v5/middleware"
@@ -33,8 +34,11 @@ func NewRouter(
 	p handler.DBPinger,
 	l Loger,
 ) (*chi.Mux, error) {
-	var privateKey *rsa.PrivateKey
-	var err error
+	var (
+		privateKey *rsa.PrivateKey
+		trustedNet *net.IPNet
+		err        error
+	)
 
 	if cfg.PrivateKey != "" {
 		privateKey, err = utils.LoadPrivateKey(cfg.PrivateKey)
@@ -43,9 +47,17 @@ func NewRouter(
 		}
 	}
 
+	if cfg.TrustedSubnet != "" {
+		_, trustedNet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
+		}
+	}
+
 	mwLogger := middleware.NewHTTPLogger(l)
 	mwHashHeader := middleware.NewHashHeader(cfg.SecretKey)
 	mwRSA := middleware.NewRSA(privateKey)
+	mwFirewall := middleware.NewFirewall(trustedNet)
 	updater := handler.NewUpdateHandler(srv, l)
 	retriever := handler.NewRetrieveHandler(srv, l)
 	pinger := handler.NewPingHandler(p)
@@ -64,6 +76,7 @@ func NewRouter(
 		r.Post("/", updater.Update)
 	})
 	router.Route("/updates", func(r chi.Router) {
+		r.Use(mwFirewall.Filter)
 		r.Use(mwRSA.Decrypt)
 		r.Use(mwHashHeader.Validate)
 		r.Post("/", updater.UpdateList)

@@ -58,7 +58,10 @@ type Config struct {
 	AuditFile string `env:"AUDIT_FILE"`
 	// URL для отправки событий аудита.
 	AuditURL string `env:"AUDIT_URL"`
-	FileCfg  FileStorageConfig
+	// Доверенная сеть в формате CIDR, из которой можно принимать метрики,
+	// если не указана, то можно принимать из любой сети
+	TrustedSubnet string `json:"trusted_subnet" env:"TRUSTED_SUBNET" env-default:""`
+	FileCfg       FileStorageConfig
 }
 
 // Загружает конфигурацию из флагов и переменных среды. Приоритет имеют переменные среды.
@@ -80,6 +83,7 @@ func Load() (*Config, error) {
 		flagK         = flag.String("k", "", "secret key")
 		flagI         = flag.Uint64("i", 300, "store interval in seconds")
 		flagR         = flag.Bool("r", false, "restore server state from file on start")
+		flagT         = flag.String("t", "", "trusted subnet in cidr format")
 		flagAuditFile = flag.String("audit-file", "", "audit file path")
 		flagAuditURL  = flag.String("audit-url", "", "audit url")
 		flagCryptoKey = flag.String("crypto-key", "", "private key path")
@@ -135,6 +139,8 @@ func Load() (*Config, error) {
 			cfg.FileCfg.Path = *flagF
 		case "r":
 			cfg.FileCfg.Restore = *flagR
+		case "t":
+			cfg.TrustedSubnet = *flagT
 		}
 	})
 
