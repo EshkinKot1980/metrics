@@ -56,9 +56,12 @@ func run() error {
 	defer auditor.Halt()
 
 	service := service.NewMetricService(storage, logger, auditor)
-	router := server.NewRouter(cfg, service, storage, logger)
+	router, err := server.NewRouter(cfg, service, storage, logger)
+	if err != nil {
+		return fmt.Errorf("failed to init router: %w", err)
+	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	return runServer(ctx, cfg.ServerAddr, router)

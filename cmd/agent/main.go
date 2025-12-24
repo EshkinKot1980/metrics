@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
+	"crypto/rsa"
 	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
@@ -12,6 +16,7 @@ import (
 	oldAPIclient "github.com/EshkinKot1980/metrics/internal/agent/client/compatible"
 	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
+	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
 type reporter interface {
@@ -42,32 +47,56 @@ func main() {
 	m := monitor.New(s)
 	am := monitor.NewAdditionalMonitor(s)
 
-	var r reporter
-	if cfg.BatchReport {
-		r = client.New(s, cfg.BaseURL, cfg.SecretKey)
-	} else {
-		r = oldAPIclient.New(s, cfg.BaseURL, cfg.RateLimit)
+	var publicKey *rsa.PublicKey
+	if cfg.PublicKey != "" {
+		publicKey, err = utils.LoadPublicKey(cfg.PublicKey)
+		if err != nil {
+			log.Fatal("failed to load public key: ", err)
+		}
 	}
 
-	pollInterval := time.Duration(cfg.PollInterval) * time.Second
+	baseURL := "http://" + cfg.APIAddres
+	var r reporter
+	if cfg.BatchReport {
+		r = client.New(s, baseURL, cfg.SecretKey, publicKey)
+	} else {
+		r = oldAPIclient.New(s, baseURL, cfg.RateLimit)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
 		for {
-			<-time.After(pollInterval)
-			m.Poll()
+			select {
+			case <-time.After(cfg.PollInterval):
+				m.Poll()
+			case <-ctx.Done():
+				return
+			}
+
 		}
 	}()
 
 	go func() {
 		for {
-			<-time.After(pollInterval)
-			am.Poll()
+			select {
+			case <-time.After(cfg.PollInterval):
+				am.Poll()
+			case <-ctx.Done():
+				return
+			}
+
 		}
 	}()
 
-	interval := time.Duration(cfg.ReportInterval) * time.Second
 	for {
-		<-time.After(interval)
-		r.Report()
+		select {
+		case <-time.After(cfg.ReportInterval):
+			r.Report()
+		case <-ctx.Done():
+			r.Report()
+			return
+		}
 	}
 }

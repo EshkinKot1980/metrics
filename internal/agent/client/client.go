@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/common/models"
+	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
 const (
@@ -34,18 +36,20 @@ type Storage interface {
 // Клиент отправляющий метрики на сервер одним запросом в формате JSON.
 // Поддерживает сжатие gzip, подпись содержимого запроса, повторные попытки отправки запроса.
 type HTTPClient struct {
-	storage Storage
-	address string
-	secret  string
-	client  *resty.Client
-	mx      sync.Mutex
+	storage   Storage
+	address   string
+	secret    string
+	publicKey *rsa.PublicKey
+	client    *resty.Client
+	mx        sync.Mutex
 }
 
-func New(s Storage, serverAddr string, secret string) *HTTPClient {
+func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) *HTTPClient {
 	c := HTTPClient{
-		storage: s,
-		address: serverAddr,
-		secret:  secret,
+		storage:   s,
+		address:   serverAddr,
+		secret:    secret,
+		publicKey: publicKey,
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
@@ -126,17 +130,10 @@ func (c *HTTPClient) sendMetrics(metrics []models.Metrics) bool {
 
 func (c *HTTPClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	var body bytes.Buffer
+	var data []byte
 
 	bodyJSON, err := json.Marshal(r.Body)
 	if err != nil {
-		return err
-	}
-
-	g := gzip.NewWriter(&body)
-	if _, err := g.Write(bodyJSON); err != nil {
-		return err
-	}
-	if err := g.Close(); err != nil {
 		return err
 	}
 
@@ -147,6 +144,23 @@ func (c *HTTPClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 		r.SetHeader("HashSHA256", hex.EncodeToString(hash))
 	}
 
+	if c.publicKey == nil {
+		data = bodyJSON
+	} else {
+		r.SetHeader("X-Encrypted", "true")
+		data, err = utils.EncryptWithPublicKey(bodyJSON, c.publicKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	g := gzip.NewWriter(&body)
+	if _, err := g.Write(data); err != nil {
+		return err
+	}
+	if err := g.Close(); err != nil {
+		return err
+	}
 	r.SetHeader("Content-Encoding", "gzip")
 	r.SetBody(&body)
 	return nil

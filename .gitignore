@@ -24,6 +24,8 @@ statictest
 # App data
 data/server/*
 !data/server/.gitkeep
+data/rsa/*
+!data/rsa/README.md
 
 # Dependency directories (remove the comment below to include it)
 vendor/
