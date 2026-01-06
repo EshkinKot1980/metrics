@@ -1,5 +1,5 @@
-// Модуль server реализует серверную часть приложения сбора метрик.
-package server
+// Модуль http реализует серверную часть приложения сбора метрик.
+package http
 
 import (
 	"crypto/rsa"
@@ -11,8 +11,8 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/common/utils"
 	"github.com/EshkinKot1980/metrics/internal/server/config"
-	"github.com/EshkinKot1980/metrics/internal/server/handler"
-	"github.com/EshkinKot1980/metrics/internal/server/middleware"
+	"github.com/EshkinKot1980/metrics/internal/server/http/handler"
+	"github.com/EshkinKot1980/metrics/internal/server/http/middleware"
 )
 
 // Cервис для работы с метриками, объединяет сервисы из пакета handler.
