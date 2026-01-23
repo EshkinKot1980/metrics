@@ -10,6 +10,7 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/server/audit"
 	"github.com/EshkinKot1980/metrics/internal/server/config"
+	"github.com/EshkinKot1980/metrics/internal/server/grpc"
 	"github.com/EshkinKot1980/metrics/internal/server/http"
 	"github.com/EshkinKot1980/metrics/internal/server/logger"
 	"github.com/EshkinKot1980/metrics/internal/server/service"
@@ -56,11 +57,19 @@ func run() error {
 	service := service.NewMetricService(storage, logger, auditor)
 	httpServer, err := http.NewApp(cfg, service, storage, logger)
 	if err != nil {
-		return fmt.Errorf("failed to init router: %w", err)
+		return fmt.Errorf("failed to init http server: %w", err)
 	}
+
+	grpcServer := grpc.NewApp(cfg, service)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
-	return httpServer.Run(ctx)
+	err = grpcServer.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start grpc server: %w", err)
+	}
+	defer grpcServer.Stop()
+
+	return httpServer.Start(ctx)
 }

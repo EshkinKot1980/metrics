@@ -46,8 +46,10 @@ type FileStorageConfig struct {
 type Config struct {
 	// DSN для подключения к СУБД Postgres.
 	DatabaseDSN string `json:"database_dsn" env:"DATABASE_DSN"`
-	// Адрес для работы веб вервера в формате "host:port".
-	ServerAddr string `json:"address" env:"ADDRESS" env-default:"localhost:8080"`
+	// Адрес для работы http cервера в формате "host:port".
+	HTTPaddr string `json:"address" env:"ADDRESS" env-default:"localhost:8080"`
+	// Адрес для работы grpc cервера в формате "host:port".
+	GRPCaddr string `json:"grpc_address" env:"GRPC_ADDRESS" env-default:":50051"`
 	// Ключ для проверки подписи запросов и подписи ответов,
 	// если не указан то проверка и подпись не производятся.
 	SecretKey string `env:"KEY"`
@@ -77,9 +79,10 @@ func Load() (*Config, error) {
 	var (
 		flagC         = flag.String("c", "", "config file path")
 		flagConfig    = flag.String("config", "", "config file path")
-		flagA         = flag.String("a", "localhost:8080", "address to serve")
+		flagA         = flag.String("a", "localhost:8080", "address to serve http")
 		flagD         = flag.String("d", "", "database dsn")
 		flagF         = flag.String("f", "data/server/metrics.json", "file storage path")
+		flagG         = flag.String("g", ":50051", "address to serve grpc")
 		flagK         = flag.String("k", "", "secret key")
 		flagI         = flag.Uint64("i", 300, "store interval in seconds")
 		flagR         = flag.Bool("r", false, "restore server state from file on start")
@@ -122,7 +125,7 @@ func Load() (*Config, error) {
 	flag.Visit(func(fl *flag.Flag) {
 		switch fl.Name {
 		case "a":
-			cfg.ServerAddr = *flagA
+			cfg.HTTPaddr = *flagA
 		case "d":
 			cfg.DatabaseDSN = *flagD
 		case "k":
@@ -141,6 +144,8 @@ func Load() (*Config, error) {
 			cfg.FileCfg.Restore = *flagR
 		case "t":
 			cfg.TrustedSubnet = *flagT
+		case "g":
+			cfg.GRPCaddr = *flagG
 		}
 	})
 

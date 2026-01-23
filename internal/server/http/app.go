@@ -32,7 +32,7 @@ func NewApp(
 	return &App{config: cfg, router: r}, nil
 }
 
-func (a *App) Run(ctx context.Context) error {
+func (a *App) Start(ctx context.Context) error {
 	srv := &http.Server{Addr: a.config.HTTPaddr, Handler: a.router}
 	errChan := make(chan error)
 
@@ -45,7 +45,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	select {
 	case err := <-errChan:
-		return err
+		return fmt.Errorf("failed to start http server: %w", err)
 	case <-time.After(time.Second):
 		log.Printf("server listening on %s\n", a.config.HTTPaddr)
 	}
