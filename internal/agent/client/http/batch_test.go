@@ -1,4 +1,4 @@
-package client
+package http
 
 import (
 	"bytes"
@@ -22,10 +22,10 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
-func testRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
+func testBatchRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
-		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
+		assert.Equal(t, BatchPath, r.URL.Path, "Request URL Path")
 		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
 		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip", "Request Accept-Encoding header")
 		assert.Contains(t, r.Header.Get("Content-Encoding"), "gzip", "Request Content-Encoding header")
@@ -68,7 +68,7 @@ func testRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
 	}
 }
 
-func TestReport(t *testing.T) {
+func TestBathcClient_Report(t *testing.T) {
 	priv, pub, err := utils.GenerateKeyPair()
 	require.Nil(t, err, "Generate rsa key pair")
 
@@ -89,12 +89,16 @@ func TestReport(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := httptest.NewServer(makeHadler(t, test.priv))
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				testBatchRequest(r, test.priv)
+			})
+
+			server := httptest.NewServer(handler)
 			defer server.Close()
 
 			storage := storage.New()
-			initStorage(storage)
-			client, err := New(storage, server.URL, "secret", test.pub)
+			testInitStorage(storage)
+			client, err := NewBatchClient(storage, server.URL, "secret", test.pub)
 			require.Nil(t, err, "Init client")
 			client.Report()
 		})
@@ -102,16 +106,7 @@ func TestReport(t *testing.T) {
 
 }
 
-func makeHadler(t *testing.T, priv *rsa.PrivateKey) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		name := "report_test"
-		t.Run(name, testRequest(r, priv))
-	}
-
-	return http.HandlerFunc(fn)
-}
-
-func initStorage(s *storage.MemoryStorage) {
+func testInitStorage(s *storage.MemoryStorage) {
 	s.Put(
 		[]agent.Counter{
 			{Name: "TestCounter", Value: 13},

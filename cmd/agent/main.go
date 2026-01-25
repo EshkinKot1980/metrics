@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,15 +12,9 @@ import (
 
 	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/client"
-	oldAPIclient "github.com/EshkinKot1980/metrics/internal/agent/client/compatible"
 	"github.com/EshkinKot1980/metrics/internal/agent/monitor"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
-	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
-
-type reporter interface {
-	Report()
-}
 
 var (
 	buildVersion string = "N/A"
@@ -47,23 +40,9 @@ func main() {
 	m := monitor.New(s)
 	am := monitor.NewAdditionalMonitor(s)
 
-	var publicKey *rsa.PublicKey
-	if cfg.PublicKey != "" {
-		publicKey, err = utils.LoadPublicKey(cfg.PublicKey)
-		if err != nil {
-			log.Fatal("failed to load public key: ", err)
-		}
-	}
-
-	baseURL := "http://" + cfg.APIAddres
-	var r reporter
-	if cfg.BatchReport {
-		r, err = client.New(s, baseURL, cfg.SecretKey, publicKey)
-		if err != nil {
-			log.Fatal("failed to init reporter: ", err)
-		}
-	} else {
-		r = oldAPIclient.New(s, baseURL, cfg.RateLimit)
+	r, err := client.NewReporter(cfg, s)
+	if err != nil {
+		log.Fatal("failed to init reporter: ", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

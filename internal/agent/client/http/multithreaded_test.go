@@ -1,4 +1,4 @@
-package compatible
+package http
 
 import (
 	"bytes"
@@ -14,18 +14,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/EshkinKot1980/metrics/internal/agent"
 	"github.com/EshkinKot1980/metrics/internal/agent/storage"
 	"github.com/EshkinKot1980/metrics/internal/common/models"
 )
 
 var testCounterChan = make(chan int)
 
-func testRequest(r *http.Request) func(t *testing.T) {
+func testSingleRequest(r *http.Request) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
 		assert.Equal(t, ContentType, r.Header.Get("Content-Type"), "Request Content-Type header")
-		assert.Equal(t, Path, r.URL.Path, "Request URL Path")
+		assert.Equal(t, SinglePath, r.URL.Path, "Request URL Path")
 
 		gz, err := gzip.NewReader(r.Body)
 		require.Nil(t, err, "Request Body decompressing: creating reader)")
@@ -62,44 +61,26 @@ done:
 		}
 	}
 
-	t.Run("query_count_test", func(t *testing.T) {
+	t.Run("query_count", func(t *testing.T) {
 		assert.Equal(t, 4, count, "Requests count")
 	})
 }
 
-func TestReport(t *testing.T) {
-	server := httptest.NewServer(makeHadler(t))
+func TestMultithreadedClient_Report(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Run("request", testSingleRequest(r))
+	})
+
+	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	storage := storage.New()
-	initStorage(storage)
-	client := New(storage, server.URL, 2)
+	testInitStorage(storage)
+	client := NewMultithreadedClient(storage, server.URL, 2)
 	client.Report()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second/10)
 	defer cancel()
 
 	testQueryCount(ctx, t)
-}
-
-func makeHadler(t *testing.T) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		name := "report_test"
-		t.Run(name, testRequest(r))
-	}
-
-	return http.HandlerFunc(fn)
-}
-
-func initStorage(s *storage.MemoryStorage) {
-	s.Put(
-		[]agent.Counter{
-			{Name: "TestCounter", Value: 13},
-			{Name: "Visitors", Value: 256},
-		},
-		[]agent.Gauge{
-			{Name: "ConstE", Value: 2.71828},
-			{Name: "TTL", Value: 3.14e50},
-		},
-	)
 }
