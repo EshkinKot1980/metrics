@@ -1,3 +1,4 @@
+// Модуль отправки метрик на http сервер.
 package http
 
 import (

@@ -22,7 +22,7 @@ import (
 	"github.com/EshkinKot1980/metrics/internal/common/utils"
 )
 
-func testBatchRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) {
+func testBatchRequest(r *http.Request, priv *rsa.PrivateKey, ip string) func(t *testing.T) {
 	return func(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method, "Request method")
 		assert.Equal(t, BatchPath, r.URL.Path, "Request URL Path")
@@ -33,8 +33,6 @@ func testBatchRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) 
 			assert.Contains(t, r.Header.Get("X-Encrypted"), "true", "Request Content-Encoding header")
 		}
 
-		ip, err := defineIP()
-		require.Nil(t, err, "Define IP address")
 		assert.Equal(t, ip, r.Header.Get("X-Real-IP"), "Request X-Real-IP header")
 
 		gz, err := gzip.NewReader(r.Body)
@@ -68,9 +66,10 @@ func testBatchRequest(r *http.Request, priv *rsa.PrivateKey) func(t *testing.T) 
 	}
 }
 
-func TestBathcClient_Report(t *testing.T) {
+func TestBatchClient_Report(t *testing.T) {
 	priv, pub, err := utils.GenerateKeyPair()
 	require.Nil(t, err, "Generate rsa key pair")
+	agentIP := "172.18.1.2"
 
 	tests := []struct {
 		name string
@@ -90,7 +89,7 @@ func TestBathcClient_Report(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				testBatchRequest(r, test.priv)
+				t.Run("request", testBatchRequest(r, test.priv, agentIP))
 			})
 
 			server := httptest.NewServer(handler)
@@ -98,8 +97,7 @@ func TestBathcClient_Report(t *testing.T) {
 
 			storage := storage.New()
 			testInitStorage(storage)
-			client, err := NewBatchClient(storage, server.URL, "secret", test.pub)
-			require.Nil(t, err, "Init client")
+			client := NewBatchClient(storage, server.URL, "secret", test.pub, agentIP)
 			client.Report()
 		})
 	}

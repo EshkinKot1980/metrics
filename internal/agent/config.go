@@ -16,8 +16,10 @@ var ErrNotNaturalNumber = errors.New("the value must be a natural number")
 
 // Конфигурация агента.
 type Config struct {
-	// Адрес сервера в формате "host:port"
+	// Адрес http сервера в формате "host:port"
 	APIAddres string `json:"address" env:"ADDRESS" env-default:"localhost:8080"`
+	// Адрес grpc cервера в формате "host:port", если не указа метрики отправляются на http сервер
+	GRPCaddr string `json:"grpc_address" env:"GRPC_ADDRESS" env-default:""`
 	// Указывает ну жли ли отправлять все метрики одним запросом
 	BatchReport bool `env:"BATCH_REPORT" env-default:"true"`
 	// Интервал сбора мертик
@@ -71,8 +73,9 @@ func LoadConfig() (*Config, error) {
 	var (
 		flagC         = flag.String("c", "", "config file path")
 		flagConfig    = flag.String("config", "", "config file path")
-		flagA         = flag.String("a", "localhost:8080", "server address")
+		flagA         = flag.String("a", "localhost:8080", "http server address")
 		flagB         = flag.Bool("b", true, "batch report, send all metrics in one request")
+		flagG         = flag.String("g", "", "grpc server address")
 		flagK         = flag.String("k", "", "secret key")
 		flagL         = flag.Uint64("l", 10, "rate limit, limit of simultaneous requests")
 		flagP         = flag.Uint64("p", 2, "poll interval in seconds")
@@ -113,6 +116,8 @@ func LoadConfig() (*Config, error) {
 			cfg.APIAddres = *flagA
 		case "d":
 			cfg.BatchReport = *flagB
+		case "g":
+			cfg.GRPCaddr = *flagG
 		case "k":
 			cfg.SecretKey = *flagK
 		case "l":

@@ -3,10 +3,13 @@ package grpc
 import (
 	"context"
 	"net"
+	"strings"
 
+	"github.com/EshkinKot1980/metrics/internal/server/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -25,6 +28,14 @@ func (f *Firewall) Filter(
 	handler grpc.UnaryHandler,
 ) (any, error) {
 	if f.trustedNet == nil {
+		var ip string
+		p, ok := peer.FromContext(ctx)
+		if ok {
+			addr := strings.Split(p.Addr.String(), ":")
+			ip = addr[0]
+		}
+		ctx = context.WithValue(ctx, service.KeyClientIP, ip)
+
 		return handler(ctx, req)
 	}
 
@@ -39,6 +50,8 @@ func (f *Firewall) Filter(
 	if !f.trustedNet.Contains(clientIP) {
 		return nil, status.Error(codes.PermissionDenied, "permission denied")
 	}
+
+	ctx = context.WithValue(ctx, service.KeyClientIP, clientIP.String())
 
 	return handler(ctx, req)
 }

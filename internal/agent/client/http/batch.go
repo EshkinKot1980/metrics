@@ -9,9 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"log"
-	"net"
 	"sync"
 	"time"
 
@@ -37,7 +35,7 @@ type Storage interface {
 
 // Клиент отправляющий метрики на сервер одним запросом в формате JSON.
 // Поддерживает сжатие gzip, подпись содержимого запроса, повторные попытки отправки запроса.
-type BathcClient struct {
+type BatchClient struct {
 	storage   Storage
 	address   string
 	secret    string
@@ -51,13 +49,9 @@ func NewBatchClient(
 	serverAddr string,
 	secret string,
 	publicKey *rsa.PublicKey,
-) (*BathcClient, error) {
-	ip, err := defineIP()
-	if err != nil {
-		return nil, err
-	}
-
-	c := BathcClient{
+	agentIP string,
+) *BatchClient {
+	c := BatchClient{
 		storage:   s,
 		address:   serverAddr,
 		secret:    secret,
@@ -65,18 +59,18 @@ func NewBatchClient(
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
-			SetHeader("X-Real-IP", ip).
+			SetHeader("X-Real-IP", agentIP).
 			SetHeader("Accept-Encoding", "gzip").
 			SetHeader("Content-Type", ContentType),
 	}
 
 	c.client.OnBeforeRequest(c.requestWrapper)
 
-	return &c, nil
+	return &c
 }
 
 // Оправляет метрики на сервер.
-func (c *BathcClient) Report() {
+func (c *BatchClient) Report() {
 	if !c.mx.TryLock() {
 		return
 	}
@@ -110,7 +104,7 @@ func (c *BathcClient) Report() {
 	}
 }
 
-func (c *BathcClient) sendMetrics(metrics []models.Metrics) bool {
+func (c *BatchClient) sendMetrics(metrics []models.Metrics) bool {
 	retries := []int{1, 3, 5}
 	i := 0
 	for {
@@ -141,7 +135,7 @@ func (c *BathcClient) sendMetrics(metrics []models.Metrics) bool {
 
 }
 
-func (c *BathcClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
+func (c *BatchClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	var body bytes.Buffer
 	var data []byte
 
@@ -177,21 +171,4 @@ func (c *BathcClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	r.SetHeader("Content-Encoding", "gzip")
 	r.SetBody(&body)
 	return nil
-}
-
-func defineIP() (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", fmt.Errorf("ошибка получения ip адресa: %w", err)
-
-	}
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String(), nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("IP адрес не найден")
 }
