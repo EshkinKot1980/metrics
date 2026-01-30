@@ -1,5 +1,5 @@
-FROM golang:1.23
+FROM golang:1.24
 
-RUN apt update && apt install -y graphviz
+RUN apt update && apt install -y graphviz protobuf-compiler
 
 WORKDIR /go/app

@@ -1,5 +1,5 @@
-// Модуль отправки метрик на сервер.
-package client
+// Модуль отправки метрик на http сервер.
+package http
 
 import (
 	"bytes"
@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Path        = "/updates"
+	BatchPath   = "/updates"
 	ContentType = "application/json"
 )
 
@@ -35,7 +35,7 @@ type Storage interface {
 
 // Клиент отправляющий метрики на сервер одним запросом в формате JSON.
 // Поддерживает сжатие gzip, подпись содержимого запроса, повторные попытки отправки запроса.
-type HTTPClient struct {
+type BatchClient struct {
 	storage   Storage
 	address   string
 	secret    string
@@ -44,8 +44,14 @@ type HTTPClient struct {
 	mx        sync.Mutex
 }
 
-func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) *HTTPClient {
-	c := HTTPClient{
+func NewBatchClient(
+	s Storage,
+	serverAddr string,
+	secret string,
+	publicKey *rsa.PublicKey,
+	agentIP string,
+) *BatchClient {
+	c := BatchClient{
 		storage:   s,
 		address:   serverAddr,
 		secret:    secret,
@@ -53,6 +59,7 @@ func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) 
 		client: resty.New().
 			SetTimeout(time.Duration(1)*time.Second).
 			SetBaseURL(serverAddr).
+			SetHeader("X-Real-IP", agentIP).
 			SetHeader("Accept-Encoding", "gzip").
 			SetHeader("Content-Type", ContentType),
 	}
@@ -63,7 +70,7 @@ func New(s Storage, serverAddr string, secret string, publicKey *rsa.PublicKey) 
 }
 
 // Оправляет метрики на сервер.
-func (c *HTTPClient) Report() {
+func (c *BatchClient) Report() {
 	if !c.mx.TryLock() {
 		return
 	}
@@ -97,19 +104,19 @@ func (c *HTTPClient) Report() {
 	}
 }
 
-func (c *HTTPClient) sendMetrics(metrics []models.Metrics) bool {
+func (c *BatchClient) sendMetrics(metrics []models.Metrics) bool {
 	retries := []int{1, 3, 5}
 	i := 0
 	for {
 		succes, retry := true, false
 		req := c.client.R().SetBody(metrics)
-		resp, err := req.Post(Path)
+		resp, err := req.Post(BatchPath)
 
 		if err != nil {
 			log.Print(err)
 			succes, retry = false, true
 		} else if !resp.IsSuccess() {
-			log.Print("POST", c.address, Path, " Code: ", resp.StatusCode(), " Body: ", resp)
+			log.Print("POST", c.address, BatchPath, " Code: ", resp.StatusCode(), " Body: ", resp)
 			succes = false
 
 			if resp.StatusCode() == 500 {
@@ -128,7 +135,7 @@ func (c *HTTPClient) sendMetrics(metrics []models.Metrics) bool {
 
 }
 
-func (c *HTTPClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
+func (c *BatchClient) requestWrapper(rc *resty.Client, r *resty.Request) error {
 	var body bytes.Buffer
 	var data []byte
 

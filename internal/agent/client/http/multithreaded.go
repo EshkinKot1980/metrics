@@ -1,7 +1,5 @@
-// Модуль отправки метрик на сервер совместимый с предыдущей версией API.
-// Достал из гита клиент, отсылающий метрики по одной на ендпоинт /update,
-// чтобы было куда воткнуть Worker Pool
-package compatible
+// Модуль отправки метрик на http сервер.
+package http
 
 import (
 	"bytes"
@@ -17,8 +15,7 @@ import (
 )
 
 const (
-	Path                  = "/update"
-	ContentType           = "application/json"
+	SinglePath            = "/update"
 	estimatedMetricsCount = 256
 )
 
@@ -30,15 +27,17 @@ type Retriever interface {
 
 // Клиент отправляющий метрики на сервер по одной в формате JSON.
 // Поддерживает отправку метрик внесколько потоков.
-type HTTPClient struct {
+// Достал из гита клиент, отсылающий метрики по одной на ендпоинт /update,
+// чтобы было куда воткнуть Worker Pool
+type MultithreadedClient struct {
 	retriever Retriever
 	address   string
 	queue     chan models.Metrics
 	client    *resty.Client
 }
 
-func New(r Retriever, serverAddr string, requestsLimit uint64) *HTTPClient {
-	c := &HTTPClient{
+func NewMultithreadedClient(r Retriever, serverAddr string, requestsLimit uint64) *MultithreadedClient {
+	c := &MultithreadedClient{
 		retriever: r,
 		address:   serverAddr,
 		queue:     make(chan models.Metrics, estimatedMetricsCount),
@@ -55,7 +54,7 @@ func New(r Retriever, serverAddr string, requestsLimit uint64) *HTTPClient {
 	return c
 }
 
-func (c *HTTPClient) makeWorkers(count uint64) {
+func (c *MultithreadedClient) makeWorkers(count uint64) {
 	for i := uint64(1); ; i++ {
 		go c.sendMetric()
 
@@ -66,7 +65,7 @@ func (c *HTTPClient) makeWorkers(count uint64) {
 }
 
 // Оправляет метрики на сервер.
-func (c *HTTPClient) Report() {
+func (c *MultithreadedClient) Report() {
 	var metric models.Metrics
 	counters, gauges := c.retriever.Pull()
 
@@ -86,16 +85,16 @@ func (c *HTTPClient) Report() {
 	}
 }
 
-func (c *HTTPClient) sendMetric() {
+func (c *MultithreadedClient) sendMetric() {
 	for {
 		metric := <-c.queue
 		req := c.client.R().SetBody(metric)
-		resp, err := req.Post(Path)
+		resp, err := req.Post(SinglePath)
 
 		if err != nil {
 			log.Print(err)
 		} else if !resp.IsSuccess() {
-			log.Print("POST", c.address, Path, " Code: ", resp.StatusCode(), " Body: ", resp)
+			log.Print("POST", c.address, SinglePath, " Code: ", resp.StatusCode(), " Body: ", resp)
 		}
 	}
 }

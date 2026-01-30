@@ -1,17 +1,18 @@
-// Модуль server реализует серверную часть приложения сбора метрик.
-package server
+// Модуль http реализует серверную часть приложения сбора метрик.
+package http
 
 import (
 	"crypto/rsa"
 	"fmt"
+	"net"
 
 	"github.com/go-chi/chi/v5"
 	chiMW "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/EshkinKot1980/metrics/internal/common/utils"
 	"github.com/EshkinKot1980/metrics/internal/server/config"
-	"github.com/EshkinKot1980/metrics/internal/server/handler"
-	"github.com/EshkinKot1980/metrics/internal/server/middleware"
+	"github.com/EshkinKot1980/metrics/internal/server/http/handler"
+	"github.com/EshkinKot1980/metrics/internal/server/http/middleware"
 )
 
 // Cервис для работы с метриками, объединяет сервисы из пакета handler.
@@ -33,8 +34,11 @@ func NewRouter(
 	p handler.DBPinger,
 	l Loger,
 ) (*chi.Mux, error) {
-	var privateKey *rsa.PrivateKey
-	var err error
+	var (
+		privateKey *rsa.PrivateKey
+		trustedNet *net.IPNet
+		err        error
+	)
 
 	if cfg.PrivateKey != "" {
 		privateKey, err = utils.LoadPrivateKey(cfg.PrivateKey)
@@ -43,9 +47,17 @@ func NewRouter(
 		}
 	}
 
+	if cfg.TrustedSubnet != "" {
+		_, trustedNet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse trusted subnet: %w", err)
+		}
+	}
+
 	mwLogger := middleware.NewHTTPLogger(l)
 	mwHashHeader := middleware.NewHashHeader(cfg.SecretKey)
 	mwRSA := middleware.NewRSA(privateKey)
+	mwFirewall := middleware.NewFirewall(trustedNet)
 	updater := handler.NewUpdateHandler(srv, l)
 	retriever := handler.NewRetrieveHandler(srv, l)
 	pinger := handler.NewPingHandler(p)
@@ -64,6 +76,7 @@ func NewRouter(
 		r.Post("/", updater.Update)
 	})
 	router.Route("/updates", func(r chi.Router) {
+		r.Use(mwFirewall.Filter)
 		r.Use(mwRSA.Decrypt)
 		r.Use(mwHashHeader.Validate)
 		r.Post("/", updater.UpdateList)
